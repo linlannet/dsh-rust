@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.plugin-host.lifecycle",
+  "title": "PluginHostLifecycle",
+  "description": "插件安装、激活、停用与状态查询的参数和结果定义。",
+  "type": "object",
+  "$defs": {
+    "installParams": {
+      "type": "object",
+      "required": ["pluginId", "sourcePath", "runtimeType"],
+      "properties": {
+        "pluginId": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string" },
+        "pluginVersion": { "type": "string" },
+        "runtimeType": { "$ref": "../common/enums.schema.json#/$defs/pluginRuntimeType" },
+        "sourcePath": { "type": "string", "minLength": 1 },
+        "entrypoint": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "activateParams": {
+      "type": "object",
+      "required": ["pluginId"],
+      "properties": {
+        "pluginId": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "deactivateParams": {
+      "type": "object",
+      "required": ["pluginId"],
+      "properties": {
+        "pluginId": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "statusParams": {
+      "type": "object",
+      "properties": {
+        "pluginId": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "pluginStatus": {
+      "type": "object",
+      "required": ["pluginId", "state", "version"],
+      "properties": {
+        "pluginId": { "type": "string", "minLength": 1 },
+        "state": {
+          "type": "string",
+          "enum": ["installed", "active", "inactive", "failed"]
+        },
+        "version": { "type": "string" },
+        "tools": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "statusResult": {
+      "type": "object",
+      "required": ["plugins"],
+      "properties": {
+        "plugins": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pluginStatus" }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

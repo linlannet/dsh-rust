@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.approval",
+  "title": "Approval",
+  "type": "object",
+  "required": ["id", "toolName", "status", "requestedAt"],
+  "properties": {
+    "id": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "toolName": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["pending", "approved", "rejected", "timeout"] },
+    "requestedAt": { "type": "string", "format": "date-time" },
+    "decidedAt": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string" },
+    "arguments": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true
+}

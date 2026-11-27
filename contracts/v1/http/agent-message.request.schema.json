@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.agent-message.request",
+  "title": "AgentMessageRequest",
+  "description": "POST /api/agent/message 请求体。字段以 Java 基线录制结果为准。",
+  "type": "object",
+  "required": ["agentId", "content"],
+  "properties": {
+    "agentId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "sessionId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "content": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "../common/content-block.schema.json" }
+    },
+    "model": { "$ref": "model.schema.json" },
+    "workspaceId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true
+}

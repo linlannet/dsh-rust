@@ -1,0 +1,20 @@
+{
+  "agentId": "agent-1",
+  "sessionId": "sess-1",
+  "runId": "run-1",
+  "message": {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "rust: 2，go: 1"
+      }
+    ]
+  },
+  "toolCalls": [],
+  "usage": {
+    "inputTokens": 12,
+    "outputTokens": 8
+  },
+  "finishReason": "stop"
+}

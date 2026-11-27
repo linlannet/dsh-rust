@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.sse.done",
+  "title": "DoneEventData",
+  "type": "object",
+  "required": ["finishReason"],
+  "properties": {
+    "finishReason": {
+      "type": "string",
+      "enum": ["stop", "tool_calls", "length", "cancelled", "error"]
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "outputTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

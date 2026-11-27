@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.message",
+  "title": "Message",
+  "type": "object",
+  "required": ["id", "role", "content", "createdAt"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "role": { "type": "string", "enum": ["user", "assistant", "system", "tool"] },
+    "content": {
+      "type": "array",
+      "items": { "$ref": "../common/content-block.schema.json" }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "runId": { "$ref": "../common/identifiers.schema.json#/$defs/id" }
+  },
+  "additionalProperties": true
+}

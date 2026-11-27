@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.plugin-host.events",
+  "title": "PluginHostEvents",
+  "description": "插件事件的订阅、发布与投递外形。",
+  "type": "object",
+  "$defs": {
+    "subscribeParams": {
+      "type": "object",
+      "required": ["eventName"],
+      "properties": {
+        "pluginId": { "type": "string" },
+        "eventName": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "publishParams": {
+      "type": "object",
+      "required": ["eventName"],
+      "properties": {
+        "eventName": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "delivery": {
+      "type": "object",
+      "required": ["eventName", "source"],
+      "properties": {
+        "eventName": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "payload": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "closeResult": {
+      "type": "object",
+      "required": ["closed"],
+      "properties": {
+        "closed": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

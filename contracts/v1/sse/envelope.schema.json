@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.sse.envelope",
+  "title": "SseEventEnvelope",
+  "description": "fixture 与回放使用的归一化事件外层；线上 SSE 包装由适配层剥离。",
+  "type": "object",
+  "required": ["seq", "event", "data"],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 1 },
+    "event": { "type": "string", "minLength": 1 },
+    "data": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true
+}

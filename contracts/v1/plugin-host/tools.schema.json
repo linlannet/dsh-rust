@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.plugin-host.tools",
+  "title": "PluginHostTools",
+  "description": "plugins tools/list 与 tools/call 的参数和结果定义。",
+  "type": "object",
+  "$defs": {
+    "listParams": {
+      "type": "object",
+      "properties": {
+        "pluginId": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "callParams": {
+      "type": "object",
+      "required": ["name", "arguments"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "arguments": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "callResult": {
+      "type": "object",
+      "required": ["content"],
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": { "$ref": "../common/content-block.schema.json" }
+        },
+        "isError": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "listResult": {
+      "type": "object",
+      "required": ["tools"],
+      "properties": {
+        "tools": {
+          "type": "array",
+          "items": { "$ref": "../common/tool.schema.json" }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

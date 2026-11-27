@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.agent-cancel.request",
+  "title": "AgentCancelRequest",
+  "description": "取消正在执行的 Agent 运行。",
+  "type": "object",
+  "required": ["agentId"],
+  "properties": {
+    "agentId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "runId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "reason": { "type": "string" }
+  },
+  "additionalProperties": true
+}

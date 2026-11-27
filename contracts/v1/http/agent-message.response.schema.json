@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.agent-message.response",
+  "title": "AgentMessageResponse",
+  "description": "POST /api/agent/message 响应体。",
+  "type": "object",
+  "required": ["agentId", "sessionId", "runId", "message", "finishReason"],
+  "properties": {
+    "agentId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "sessionId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "runId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "message": {
+      "type": "object",
+      "required": ["role", "content"],
+      "properties": {
+        "role": { "type": "string", "enum": ["assistant"] },
+        "content": {
+          "type": "array",
+          "items": { "$ref": "../common/content-block.schema.json" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "toolCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["toolCallId", "name", "status"],
+        "properties": {
+          "toolCallId": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["started", "completed", "failed"] },
+          "arguments": { "type": "object", "additionalProperties": true }
+        },
+        "additionalProperties": true
+      }
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "inputTokens": { "type": "integer", "minimum": 0 },
+        "outputTokens": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "finishReason": {
+      "type": "string",
+      "enum": ["stop", "tool_calls", "length", "cancelled", "error"]
+    }
+  },
+  "additionalProperties": true
+}

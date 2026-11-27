@@ -1,0 +1,6 @@
+{"eventId":"evt-1","sessionId":"sess-1","seq":1,"type":"session.created","timestamp":"2026-11-27T00:00:00Z","payload":{"agentId":"agent-1"}}
+{"eventId":"evt-2","sessionId":"sess-1","seq":2,"type":"message.appended","timestamp":"2026-11-27T00:00:01Z","payload":{"messageId":"msg-1","role":"user","content":[{"type":"text","text":"统计 rust go rust"}]}}
+{"eventId":"evt-3","sessionId":"sess-1","seq":3,"type":"run.started","timestamp":"2026-11-27T00:00:02Z","payload":{"runId":"run-1"}}
+{"eventId":"evt-4","sessionId":"sess-1","seq":4,"type":"tool.requested","timestamp":"2026-11-27T00:00:03Z","payload":{"toolCallId":"tc-1","name":"word_count","arguments":{"text":"rust go rust"}}}
+{"eventId":"evt-5","sessionId":"sess-1","seq":5,"type":"tool.completed","timestamp":"2026-11-27T00:00:04Z","payload":{"toolCallId":"tc-1","isError":false}}
+{"eventId":"evt-6","sessionId":"sess-1","seq":6,"type":"run.completed","timestamp":"2026-11-27T00:00:05Z","payload":{"runId":"run-1","finishReason":"stop"}}

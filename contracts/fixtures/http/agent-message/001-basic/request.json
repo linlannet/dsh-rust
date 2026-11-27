@@ -1,0 +1,13 @@
+{
+  "agentId": "agent-1",
+  "content": [
+    {
+      "type": "text",
+      "text": "统计 rust go rust"
+    }
+  ],
+  "model": {
+    "channelCode": "mock",
+    "model": "mock-1"
+  }
+}

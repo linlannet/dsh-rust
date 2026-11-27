@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.plugin-host.hooks",
+  "title": "PluginHostHooks",
+  "description": "进程内 Hook 的跨进程等价物。PRE_TOOL_USE 的 block/deny 会阻止工具执行。",
+  "type": "object",
+  "$defs": {
+    "hookPoint": {
+      "type": "string",
+      "enum": [
+        "PRE_TOOL_USE",
+        "POST_TOOL_USE",
+        "USER_PROMPT_SUBMIT",
+        "SESSION_START",
+        "STOP",
+        "NOTIFICATION"
+      ]
+    },
+    "invokeParams": {
+      "type": "object",
+      "required": ["hookPoint"],
+      "properties": {
+        "pluginId": { "type": "string" },
+        "hookPoint": { "$ref": "#/$defs/hookPoint" },
+        "toolName": { "type": "string" },
+        "arguments": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    },
+    "invokeResult": {
+      "type": "object",
+      "required": ["decision"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["allow", "block", "deny"] },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

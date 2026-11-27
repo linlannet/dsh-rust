@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "apps/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+rust-version = "1.85"
+
+[workspace.dependencies]
+dsh-types = { path = "crates/dsh-types" }
+dsh-domain = { path = "crates/dsh-domain" }
+dsh-case = { path = "crates/dsh-case" }
+dsh-http = { path = "crates/dsh-http" }
+dsh-infra = { path = "crates/dsh-infra" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"

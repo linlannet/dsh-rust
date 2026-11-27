@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.task",
+  "title": "Task",
+  "type": "object",
+  "required": ["id", "type", "status", "createdAt", "updatedAt"],
+  "properties": {
+    "id": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "type": { "type": "string", "minLength": 1 },
+    "status": { "$ref": "../common/enums.schema.json#/$defs/runStatus" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "error": { "$ref": "../common/error.schema.json" }
+  },
+  "additionalProperties": true
+}

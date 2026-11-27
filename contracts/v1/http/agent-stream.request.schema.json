@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.agent-stream.request",
+  "title": "AgentStreamRequest",
+  "description": "POST /api/agent/stream 请求体，与阻塞式消息共用结构。",
+  "$ref": "agent-message.request.schema.json"
+}

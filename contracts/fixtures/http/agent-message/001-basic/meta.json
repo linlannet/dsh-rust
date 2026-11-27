@@ -1,0 +1,17 @@
+{
+  "scenario": "http/agent-message/001-basic",
+  "contracts": {
+    "request": "v1/http/agent-message.request.schema.json",
+    "response": "v1/http/agent-message.response.schema.json"
+  },
+  "origin": "handwritten-sample",
+  "recorded": false,
+  "capturedAt": null,
+  "source": {
+    "repo": null,
+    "commit": null,
+    "endpoint": "POST /api/agent/message"
+  },
+  "normalized": ["agentId", "sessionId", "runId", "createdAt"],
+  "redacted": ["apiKey", "authorization"]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.common.tool",
+  "title": "ToolDescriptor",
+  "description": "Agent 可调用工具的跨进程描述。工具名允许 plugin__、mcp__ 前缀。",
+  "type": "object",
+  "required": ["name", "description", "inputSchema"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[A-Za-z0-9_.:-]+$"
+    },
+    "description": { "type": "string" },
+    "inputSchema": { "type": "object", "additionalProperties": true },
+    "outputSchema": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": true
+}

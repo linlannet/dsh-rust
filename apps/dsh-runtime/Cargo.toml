@@ -1,0 +1,21 @@
+[package]
+name = "dsh-runtime"
+description = "DSH Rust Runtime 可执行入口"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "dsh-runtime"
+path = "src/main.rs"
+
+[dependencies]
+dsh-case.workspace = true
+dsh-http.workspace = true
+dsh-infra.workspace = true
+dsh-types.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.plugin-host.prompts",
+  "title": "PluginHostPrompts",
+  "description": "插件贡献的系统提示词段落；停止时由宿主移除。",
+  "type": "object",
+  "$defs": {
+    "registerParams": {
+      "type": "object",
+      "required": ["name", "order", "text"],
+      "properties": {
+        "pluginId": { "type": "string" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "order": { "type": "integer" },
+        "text": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "prompt": {
+      "type": "object",
+      "required": ["name", "order", "text"],
+      "properties": {
+        "name": { "type": "string" },
+        "order": { "type": "integer" },
+        "text": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
