@@ -1,0 +1,43 @@
+# DSH Rust (dsh-rust) — Agent Harness
+
+> A contract-first Rust implementation of DeepSeek Harness.
+> Cargo workspace with domain ports, use cases, HTTP/SSE constants and an in-memory adapter.
+
+Key capabilities (v0.1.0 skeleton):
+- Contract-first workspace: `contracts/v1` schemas mirrored by `dsh-types`
+- Layered crates: types -> domain <- case -> http/infra
+- Types: `ContentBlock` (text), `ToolDescriptor` + `JsonSchema`, typed IDs (`agent-`, `sess-`, …), `Error`/`ErrorCode`
+- Session aggregate and `SessionRepository` port with in-memory implementation
+- Run-request validation (blank text rejected with `invalid_request`)
+- HTTP/SSE route constants fixed ahead of the server
+- Runnable `dsh-runtime` entry that self-checks wiring
+- Quality gates: rustfmt, clippy `-D warnings`, unit tests, contract schema validation
+
+Tech stack: Rust 1.85+, edition 2024, Cargo workspace, Node.js 20 (contract tooling)
+Version: 0.1.0
+Contract version: 1.0.0-draft.1
+Upstream: https://github.com/deepseek-ai/deepseek-harness
+Java counterpart: https://github.com/linlannet/dsh-java
+
+Build: `cargo build --workspace`
+Test:  `cargo test --workspace`
+Run:   `cargo run -p dsh-runtime`
+Lint:  `cargo clippy --workspace --all-targets -- -D warnings`
+Contracts: `node contracts/tools/validate.mjs`
+
+Crate map:
+- crates/dsh-types   contract value objects, IDs, error model
+- crates/dsh-domain  session aggregate, ports
+- crates/dsh-case    use cases and request validation
+- crates/dsh-http    HTTP/SSE route and event constants
+- crates/dsh-infra   adapters (in-memory session repository)
+- apps/dsh-runtime   executable entry with self-check
+- contracts/         v1 schemas, fixtures, policy, tools
+
+Docs:
+- README.md / README.en.md
+- docs/0.1.0/ (spec, design, tasks, release notes)
+- contracts/README.md
+- AGENTS.md
+
+Not included yet: HTTP server, model calls, ReAct loop, plugin host, persistence, approvals, tool execution.
