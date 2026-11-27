@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.common.enums",
+  "title": "Enums",
+  "description": "共享枚举定义。API 枚举默认开放，消费者必须有 default 分支。",
+  "type": "object",
+  "$defs": {
+    "runStatus": {
+      "type": "string",
+      "enum": ["pending", "running", "completed", "failed", "cancelled"]
+    },
+    "messageRole": {
+      "type": "string",
+      "enum": ["user", "assistant", "system", "tool"]
+    },
+    "approvalDecision": {
+      "type": "string",
+      "enum": ["approved", "rejected", "timeout"]
+    },
+    "pluginRuntimeType": {
+      "type": "string",
+      "enum": ["JAVA_NATIVE", "NODE_BRIDGE"]
+    },
+    "sseEventName": {
+      "type": "string",
+      "enum": ["chunk", "tool_call", "done", "error"]
+    }
+  }
+}

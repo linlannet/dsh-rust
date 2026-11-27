@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.plugin-install.request",
+  "title": "PluginInstallRequest",
+  "description": "POST /api/harness/plugins/install 请求体。",
+  "type": "object",
+  "required": ["pluginId", "pluginVersion", "runtimeType", "sourcePath"],
+  "properties": {
+    "pluginId": { "type": "string", "minLength": 1 },
+    "displayName": { "type": "string" },
+    "pluginVersion": { "type": "string", "minLength": 1 },
+    "runtimeType": { "$ref": "../common/enums.schema.json#/$defs/pluginRuntimeType" },
+    "sourcePath": { "type": "string", "minLength": 1 },
+    "entrypoint": { "type": "string" }
+  },
+  "additionalProperties": true
+}

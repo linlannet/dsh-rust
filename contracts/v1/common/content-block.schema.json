@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.common.content-block",
+  "title": "ContentBlock",
+  "description": "v1 草案仅包含文本块；新增类型属于兼容变更。",
+  "type": "object",
+  "required": ["type", "text"],
+  "properties": {
+    "type": { "type": "string", "enum": ["text"] },
+    "text": { "type": "string" }
+  },
+  "additionalProperties": true
+}

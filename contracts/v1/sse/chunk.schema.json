@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.sse.chunk",
+  "title": "ChunkEventData",
+  "type": "object",
+  "required": ["delta"],
+  "properties": {
+    "messageId": { "type": "string" },
+    "delta": { "type": "string" }
+  },
+  "additionalProperties": true
+}

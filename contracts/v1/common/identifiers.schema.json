@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.common.identifiers",
+  "title": "Identifiers",
+  "description": "跨 HTTP、SSE、持久化复用的标识符定义。",
+  "type": "object",
+  "properties": {
+    "agentId": { "$ref": "#/$defs/id" },
+    "sessionId": { "$ref": "#/$defs/id" },
+    "runId": { "$ref": "#/$defs/id" },
+    "taskId": { "$ref": "#/$defs/id" },
+    "approvalId": { "$ref": "#/$defs/id" },
+    "workspaceId": { "$ref": "#/$defs/id" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    }
+  }
+}

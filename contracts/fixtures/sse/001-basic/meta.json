@@ -1,0 +1,22 @@
+{
+  "scenario": "sse/001-basic",
+  "contracts": {
+    "envelope": "v1/sse/envelope.schema.json",
+    "events": {
+      "chunk": "v1/sse/chunk.schema.json",
+      "tool_call": "v1/sse/tool-call.schema.json",
+      "done": "v1/sse/done.schema.json",
+      "error": "v1/sse/error.schema.json"
+    }
+  },
+  "origin": "handwritten-sample",
+  "recorded": false,
+  "capturedAt": null,
+  "source": {
+    "repo": null,
+    "commit": null,
+    "endpoint": "POST /api/agent/stream"
+  },
+  "normalized": ["messageId", "toolCallId"],
+  "redacted": ["apiKey", "authorization"]
+}

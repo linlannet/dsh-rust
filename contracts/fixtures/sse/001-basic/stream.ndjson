@@ -1,0 +1,5 @@
+{"seq":1,"event":"chunk","data":{"messageId":"msg-1","delta":"rust: 2"}}
+{"seq":2,"event":"chunk","data":{"messageId":"msg-1","delta":"，go: 1"}}
+{"seq":3,"event":"tool_call","data":{"toolCallId":"tc-1","name":"word_count","status":"started","arguments":{"text":"rust go rust"}}}
+{"seq":4,"event":"tool_call","data":{"toolCallId":"tc-1","name":"word_count","status":"completed","result":{"content":[{"type":"text","text":"rust: 2, go: 1"}]}}}
+{"seq":5,"event":"done","data":{"finishReason":"stop","usage":{"inputTokens":12,"outputTokens":8}}}

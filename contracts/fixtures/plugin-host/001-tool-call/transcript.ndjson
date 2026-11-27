@@ -1,0 +1,7 @@
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"dsh-plugin-host/1","clientInfo":{"name":"dsh-rust","version":"0.1.0"}}}
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"dsh-plugin-host/1","capabilities":["tools","hooks","events","prompts"],"hostVersion":"0.1.0"}}
+{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"plugin__sample__now","description":"返回当前时间","inputSchema":{"type":"object","properties":{}}}]}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"plugin__sample__now","arguments":{}}}
+{"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"2026-11-27T00:00:00Z"}],"isError":false}}

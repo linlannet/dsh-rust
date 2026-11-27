@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.model",
+  "title": "ModelSelection",
+  "description": "单次请求使用的模型渠道。",
+  "type": "object",
+  "required": ["channelCode", "model"],
+  "properties": {
+    "channelCode": { "type": "string", "minLength": 1 },
+    "model": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": true
+}

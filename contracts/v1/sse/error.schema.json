@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.sse.error",
+  "title": "ErrorEventData",
+  "type": "object",
+  "required": ["code", "message"],
+  "properties": {
+    "code": { "type": "string", "minLength": 1 },
+    "message": { "type": "string" },
+    "retryable": { "type": "boolean" },
+    "traceId": { "type": "string" }
+  },
+  "additionalProperties": true
+}

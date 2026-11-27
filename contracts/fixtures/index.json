@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0-draft.1",
+  "cases": [
+    {
+      "id": "http.agent-message.001-basic",
+      "path": "http/agent-message/001-basic",
+      "tags": ["smoke", "http"],
+      "appliesTo": ["java", "rust"],
+      "status": "handwritten-sample"
+    },
+    {
+      "id": "sse.agent-stream.001-basic",
+      "path": "sse/001-basic",
+      "tags": ["smoke", "sse"],
+      "appliesTo": ["java", "rust"],
+      "status": "handwritten-sample"
+    },
+    {
+      "id": "plugin-host.tools.001-tool-call",
+      "path": "plugin-host/001-tool-call",
+      "tags": ["smoke", "plugin-host"],
+      "appliesTo": ["rust"],
+      "status": "handwritten-sample"
+    },
+    {
+      "id": "persistence.session.001-replay",
+      "path": "persistence/001-session-replay",
+      "tags": ["smoke", "persistence"],
+      "appliesTo": ["java", "rust"],
+      "status": "handwritten-sample"
+    }
+  ]
+}

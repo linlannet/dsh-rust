@@ -1,0 +1,16 @@
+{
+  "scenario": "plugin-host/001-tool-call",
+  "contracts": {
+    "envelope": "v1/plugin-host/envelope.schema.json"
+  },
+  "origin": "handwritten-sample",
+  "recorded": false,
+  "capturedAt": null,
+  "source": {
+    "repo": null,
+    "commit": null,
+    "endpoint": "stdio JSON-RPC"
+  },
+  "normalized": ["id", "tools/call result text"],
+  "redacted": []
+}

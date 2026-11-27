@@ -1,0 +1,15 @@
+[package]
+name = "dsh-infra"
+description = "基础设施适配器"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+dsh-domain.workspace = true
+dsh-types.workspace = true
+
+[lints]
+workspace = true
