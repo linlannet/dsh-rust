@@ -1,9 +1,12 @@
 //! HTTP 与 SSE 接入层。
-//!
-//! 骨架阶段只固定路径与事件常量。Axum、Tokio 等具体选型留待依赖审查与基准，
-//! 不在此处提前绑定。
 
-/// 对外路由。
+pub mod dto;
+pub mod error;
+pub mod router;
+pub mod sse;
+pub mod trace;
+
+/// 对外路由常量。
 pub mod routes {
     /// 健康检查。
     pub const HEALTH: &str = "/health";
@@ -23,6 +26,10 @@ pub mod routes {
 
 /// SSE 心跳注释行，不计入业务事件。
 pub const SSE_KEEPALIVE: &str = ":keepalive";
+
+pub use error::HttpError;
+pub use router::{AppState, build_router, serve};
+pub use sse::{RunEventStream, channel, sse_response};
 
 #[cfg(test)]
 mod tests {

@@ -1,0 +1,17 @@
+{
+  "scenario": "http/agent-message/002-tool-call",
+  "contracts": {
+    "request": "v1/http/agent-message.request.schema.json",
+    "response": "v1/http/agent-message.response.schema.json"
+  },
+  "origin": "runtime-export",
+  "recorded": true,
+  "capturedAt": "2026-11-27T16:25:24Z",
+  "source": {
+    "repo": "dsh-rust",
+    "commit": null,
+    "endpoint": "POST /api/agent/message"
+  },
+  "normalized": ["sessionId", "runId", "now"],
+  "redacted": ["apiKey", "authorization"]
+}

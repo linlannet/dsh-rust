@@ -14,8 +14,9 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo check --workspace --all-features
+      - run: cargo test --workspace --all-features
 
   contracts:
     runs-on: ubuntu-latest
@@ -25,3 +26,4 @@ jobs:
         with:
           node-version: 20
       - run: node contracts/tools/validate.mjs
+      - run: node contracts/tools/generate-openapi.mjs --check

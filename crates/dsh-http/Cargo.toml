@@ -7,5 +7,20 @@ license.workspace = true
 rust-version.workspace = true
 publish = false
 
+[dependencies]
+dsh-case.workspace = true
+dsh-domain.workspace = true
+dsh-types.workspace = true
+axum.workspace = true
+futures-util.workspace = true
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+dsh-infra.workspace = true
+tower = { version = "0.5", features = ["util"] }
+
 [lints]
 workspace = true

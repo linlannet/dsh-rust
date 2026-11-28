@@ -8,8 +8,13 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+tokio.workspace = true
+serde_json.workspace = true
 dsh-domain.workspace = true
 dsh-types.workspace = true
+
+[dev-dependencies]
+dsh-infra.workspace = true
 
 [lints]
 workspace = true

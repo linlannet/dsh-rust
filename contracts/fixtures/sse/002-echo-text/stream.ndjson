@@ -1,0 +1,2 @@
+{"seq":1,"event":"chunk","data":{"messageId":"msg-1","delta":"echo: hi"}}
+{"seq":2,"event":"done","data":{"finishReason":"stop"}}

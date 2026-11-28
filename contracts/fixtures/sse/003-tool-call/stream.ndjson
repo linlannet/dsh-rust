@@ -1,0 +1,4 @@
+{"seq":1,"event":"tool_call","data":{"toolCallId":"call-clock-1","name":"clock","status":"started","arguments":{}}}
+{"seq":2,"event":"tool_call","data":{"toolCallId":"call-clock-1","name":"clock","status":"completed","result":{"now":"<now>"},"arguments":{}}}
+{"seq":3,"event":"chunk","data":{"messageId":"msg-1","delta":"observed: {\"now\":\"<now>\"}"}}
+{"seq":4,"event":"done","data":{"finishReason":"stop"}}

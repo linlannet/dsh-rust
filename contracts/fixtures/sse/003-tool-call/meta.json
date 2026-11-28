@@ -1,0 +1,22 @@
+{
+  "scenario": "sse/003-tool-call",
+  "contracts": {
+    "envelope": "v1/sse/envelope.schema.json",
+    "events": {
+      "chunk": "v1/sse/chunk.schema.json",
+      "tool_call": "v1/sse/tool-call.schema.json",
+      "done": "v1/sse/done.schema.json",
+      "error": "v1/sse/error.schema.json"
+    }
+  },
+  "origin": "runtime-export",
+  "recorded": true,
+  "capturedAt": "2026-11-27T16:25:24Z",
+  "source": {
+    "repo": "dsh-rust",
+    "commit": null,
+    "endpoint": "POST /api/agent/stream"
+  },
+  "normalized": ["messageId", "toolCallId", "now"],
+  "redacted": ["apiKey", "authorization"]
+}

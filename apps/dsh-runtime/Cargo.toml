@@ -12,10 +12,19 @@ name = "dsh-runtime"
 path = "src/main.rs"
 
 [dependencies]
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
 dsh-case.workspace = true
+dsh-domain.workspace = true
 dsh-http.workspace = true
 dsh-infra.workspace = true
 dsh-types.workspace = true
+
+[features]
+default = []
+deepseek = ["dsh-infra/deepseek"]
 
 [lints]
 workspace = true

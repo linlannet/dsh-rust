@@ -56,3 +56,48 @@ mod tests {
         assert!(!repository.is_empty());
     }
 }
+
+/// 进程内运行事件日志，可按运行导出 NDJSON。
+#[derive(Debug, Default)]
+pub struct InMemoryRunEventLog {
+    events: Mutex<HashMap<dsh_types::RunId, Vec<dsh_domain::RunEvent>>>,
+}
+
+impl InMemoryRunEventLog {
+    /// 追加事件。
+    pub fn append(&self, run_id: &dsh_types::RunId, event: dsh_domain::RunEvent) {
+        if let Ok(mut events) = self.events.lock() {
+            events.entry(run_id.clone()).or_default().push(event);
+        }
+    }
+
+    /// 返回某运行的事件。
+    pub fn events(&self, run_id: &dsh_types::RunId) -> Vec<dsh_domain::RunEvent> {
+        self.events
+            .lock()
+            .ok()
+            .and_then(|events| events.get(run_id).cloned())
+            .unwrap_or_default()
+    }
+
+    /// 导出事件名序列，供契约回放比对（不含 seq）。
+    pub fn event_names(&self, run_id: &dsh_types::RunId) -> Vec<&'static str> {
+        self.events
+            .lock()
+            .ok()
+            .and_then(|events| {
+                events.get(run_id).map(|events| {
+                    events
+                        .iter()
+                        .map(|event| match event {
+                            dsh_domain::RunEvent::Chunk { .. } => "chunk",
+                            dsh_domain::RunEvent::ToolCall { .. } => "tool_call",
+                            dsh_domain::RunEvent::Done { .. } => "done",
+                            dsh_domain::RunEvent::Error { .. } => "error",
+                        })
+                        .collect()
+                })
+            })
+            .unwrap_or_default()
+    }
+}

@@ -1,8 +1,14 @@
+use serde::{Deserialize, Serialize};
+
 /// 消息内容块。v1 草案仅包含文本块。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
 pub enum ContentBlock {
     /// 文本内容。
-    Text { text: String },
+    Text {
+        /// 文本正文。
+        text: String,
+    },
 }
 
 impl ContentBlock {
@@ -27,5 +33,14 @@ mod tests {
     fn builds_text_block() {
         let block = ContentBlock::text("hello");
         assert_eq!(block.as_text(), "hello");
+    }
+
+    #[test]
+    fn serializes_as_contract_text_block() {
+        let block = ContentBlock::text("hello");
+        let json = serde_json::to_value(&block).expect("serialize");
+        assert_eq!(json, serde_json::json!({"type": "text", "text": "hello"}));
+        let parsed: ContentBlock = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(parsed, block);
     }
 }

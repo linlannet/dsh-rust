@@ -8,8 +8,18 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
+reqwest = { workspace = true, optional = true }
 dsh-domain.workspace = true
 dsh-types.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[features]
+default = []
+deepseek = ["dep:reqwest"]
 
 [lints]
 workspace = true

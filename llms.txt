@@ -1,43 +1,49 @@
 # DSH Rust (dsh-rust) — Agent Harness
 
 > A contract-first Rust implementation of DeepSeek Harness.
-> Cargo workspace with domain ports, use cases, HTTP/SSE constants and an in-memory adapter.
+> Layered Cargo workspace with runnable HTTP/SSE, a minimal ReAct loop and built-in tools.
 
-Key capabilities (v0.1.0 skeleton):
-- Contract-first workspace: `contracts/v1` schemas mirrored by `dsh-types`
-- Layered crates: types -> domain <- case -> http/infra
-- Types: `ContentBlock` (text), `ToolDescriptor` + `JsonSchema`, typed IDs (`agent-`, `sess-`, …), `Error`/`ErrorCode`
-- Session aggregate and `SessionRepository` port with in-memory implementation
-- Run-request validation (blank text rejected with `invalid_request`)
-- HTTP/SSE route constants fixed ahead of the server
-- Runnable `dsh-runtime` entry that self-checks wiring
-- Quality gates: rustfmt, clippy `-D warnings`, unit tests, contract schema validation
+Key capabilities (v0.2.0):
+- HTTP service: `GET /health`, `POST /api/agent/message`, `POST /api/agent/stream`, `POST /api/agent/cancel`
+- Minimal ReAct loop: model step -> tool call -> observation -> next step -> stop (default max 8 steps)
+- Models: scriptable FakeModel (default); DeepSeek Chat Completions behind feature `deepseek`
+- Tools: `echo`, `clock`, `read_file` (workspace sandbox, UTF-8, 256 KiB, 5s timeout)
+- SSE: `chunk` / `tool_call` / `done` / `error`; increasing seq, single terminal event, keepalive excluded
+- Cancellation: cancel by `runId` or `agentId`; idempotent after completion
+- Contract replay: 8 fixtures (4 handwritten, 4 runtime-exported); openapi generated and CI-checked
+- In-memory sessions, runs and event logs (no persistence yet)
 
-Tech stack: Rust 1.85+, edition 2024, Cargo workspace, Node.js 20 (contract tooling)
-Version: 0.1.0
+Tech stack: Rust 1.85+, edition 2024, Axum 0.8, Tokio 1, serde/serde_json, tracing
+Version: 0.2.0
 Contract version: 1.0.0-draft.1
 Upstream: https://github.com/deepseek-ai/deepseek-harness
 Java counterpart: https://github.com/linlannet/dsh-java
 
 Build: `cargo build --workspace`
-Test:  `cargo test --workspace`
+Test:  `cargo test --workspace --all-features`
 Run:   `cargo run -p dsh-runtime`
-Lint:  `cargo clippy --workspace --all-targets -- -D warnings`
+Lint:  `cargo clippy --workspace --all-targets --all-features -- -D warnings`
 Contracts: `node contracts/tools/validate.mjs`
+OpenAPI: `node contracts/tools/generate-openapi.mjs --check`
 
 Crate map:
 - crates/dsh-types   contract value objects, IDs, error model
-- crates/dsh-domain  session aggregate, ports
-- crates/dsh-case    use cases and request validation
-- crates/dsh-http    HTTP/SSE route and event constants
-- crates/dsh-infra   adapters (in-memory session repository)
-- apps/dsh-runtime   executable entry with self-check
-- contracts/         v1 schemas, fixtures, policy, tools
+- crates/dsh-domain  session aggregate, model/tool ports, run events
+- crates/dsh-case    ReAct orchestration, tool/run registries, event sink
+- crates/dsh-http    Axum routes, DTOs, error mapping, SSE encoding
+- crates/dsh-infra   FakeModel/DeepSeek, tools, sandbox, in-memory stores
+- apps/dsh-runtime   executable entry and configuration
+- contracts/         v1 schemas/openapi, fixtures, policy, tools
+
+Configuration (env):
+`DSH_BIND_ADDR`, `DSH_MODEL` (fake|deepseek), `DSH_FAKE_SCRIPT` (echo|tool), `DSH_MAX_STEPS`,
+`DSH_TOOL_TIMEOUT_MS`, `DSH_MODEL_TIMEOUT_MS`, `DSH_WORKSPACE_ROOT`,
+`DSH_READ_FILE_MAX_BYTES`, `DSH_MODEL_BASE_URL`, `DEEPSEEK_API_KEY`.
 
 Docs:
 - README.md / README.en.md
-- docs/0.1.0/ (spec, design, tasks, release notes)
+- docs/0.1.0/, docs/0.2.0/ (spec, design, tasks, release notes)
 - contracts/README.md
 - AGENTS.md
 
-Not included yet: HTTP server, model calls, ReAct loop, plugin host, persistence, approvals, tool execution.
+Not included yet: plugin host, persistence, authentication, approvals, multi-tenancy.

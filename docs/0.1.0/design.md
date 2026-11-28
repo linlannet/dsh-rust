@@ -241,8 +241,8 @@ contracts/CHANGELOG.md
 | Web 框架（Axum/Actix） | 0.2.0 接入 HTTP 前，用基准与依赖审查决定 |
 | 异步运行时（Tokio） | 与 Web 框架一并决定 |
 | 序列化（serde/serde_json） | `dsh-types` 需要结构化 JSON 时 |
-| 存储（SQLx/SQLite/PostgreSQL） | 0.3.x 持久化前 |
-| 插件加载（动态库/WASM/进程） | 0.3.x 插件宿主前 |
+| 存储（SQLx/SQLite/PostgreSQL） | 0.2.1 持久化前 |
+| 插件加载（动态库/WASM/进程） | 0.2.1 插件宿主前 |
 
 **约束**：任何选型落地前，先在本文档新增决策记录（选型、备选、理由、影响），再改代码。
 

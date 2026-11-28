@@ -131,8 +131,8 @@
 
 - [ ] 0.2.0：Web/异步选型 + HTTP/SSE 服务接入
 - [ ] 0.2.0：ReAct 最小循环 + 工具注册 + 假模型
-- [ ] 0.3.x：插件宿主与 manifest（对 `contracts/v1/plugin-host`）
-- [ ] 0.3.x：会话事件日志与持久化（SQLite/PostgreSQL）
+- [ ] 0.2.1：插件宿主与 manifest（对 `contracts/v1/plugin-host`）
+- [ ] 0.2.1：会话事件日志与持久化（SQLite/PostgreSQL）
 
 ---
 

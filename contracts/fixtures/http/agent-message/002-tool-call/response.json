@@ -1,0 +1,26 @@
+{
+  "agentId": "agent-1",
+  "sessionId": "sess-1",
+  "runId": "run-1",
+  "message": {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "observed: {\"now\":\"<now>\"}"
+      }
+    ]
+  },
+  "toolCalls": [
+    {
+      "toolCallId": "call-clock-1",
+      "name": "clock",
+      "status": "completed",
+      "arguments": {},
+      "result": {
+        "now": "<now>"
+      }
+    }
+  ],
+  "finishReason": "stop"
+}

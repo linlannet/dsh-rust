@@ -4,30 +4,101 @@
     {
       "id": "http.agent-message.001-basic",
       "path": "http/agent-message/001-basic",
-      "tags": ["smoke", "http"],
-      "appliesTo": ["java", "rust"],
+      "tags": [
+        "smoke",
+        "http"
+      ],
+      "appliesTo": [
+        "java",
+        "rust"
+      ],
       "status": "handwritten-sample"
     },
     {
       "id": "sse.agent-stream.001-basic",
       "path": "sse/001-basic",
-      "tags": ["smoke", "sse"],
-      "appliesTo": ["java", "rust"],
+      "tags": [
+        "smoke",
+        "sse"
+      ],
+      "appliesTo": [
+        "java",
+        "rust"
+      ],
       "status": "handwritten-sample"
     },
     {
       "id": "plugin-host.tools.001-tool-call",
       "path": "plugin-host/001-tool-call",
-      "tags": ["smoke", "plugin-host"],
-      "appliesTo": ["rust"],
+      "tags": [
+        "smoke",
+        "plugin-host"
+      ],
+      "appliesTo": [
+        "rust"
+      ],
       "status": "handwritten-sample"
     },
     {
       "id": "persistence.session.001-replay",
       "path": "persistence/001-session-replay",
-      "tags": ["smoke", "persistence"],
-      "appliesTo": ["java", "rust"],
+      "tags": [
+        "smoke",
+        "persistence"
+      ],
+      "appliesTo": [
+        "java",
+        "rust"
+      ],
       "status": "handwritten-sample"
+    },
+    {
+      "id": "http.agent-message.002-tool-call",
+      "path": "http/agent-message/002-tool-call",
+      "tags": [
+        "http",
+        "tool"
+      ],
+      "appliesTo": [
+        "rust"
+      ],
+      "status": "runtime-export"
+    },
+    {
+      "id": "sse.agent-stream.002-echo-text",
+      "path": "sse/002-echo-text",
+      "tags": [
+        "sse",
+        "text"
+      ],
+      "appliesTo": [
+        "rust"
+      ],
+      "status": "runtime-export"
+    },
+    {
+      "id": "sse.agent-stream.003-tool-call",
+      "path": "sse/003-tool-call",
+      "tags": [
+        "sse",
+        "tool"
+      ],
+      "appliesTo": [
+        "rust"
+      ],
+      "status": "runtime-export"
+    },
+    {
+      "id": "sse.agent-stream.004-cancelled",
+      "path": "sse/004-cancelled",
+      "tags": [
+        "sse",
+        "cancel"
+      ],
+      "appliesTo": [
+        "rust"
+      ],
+      "status": "runtime-export"
     }
   ]
 }

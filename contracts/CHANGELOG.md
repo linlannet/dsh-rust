@@ -6,6 +6,8 @@
 
 ### Added
 
+- 新增 4 组运行时导出 fixtures：阻塞工具调用、流式文本、流式工具调用、取消。
+- 新增 `tools/generate-openapi.mjs`，从路由表生成 `v1/openapi.yaml` 并支持 `--check`。
 - 初始化 `v1` 骨架：common、http、sse、plugin-host、plugin-manifest、persistence、config、external。
 - 初始化 `fixtures` 样例与 `tools` 校验脚本。
 

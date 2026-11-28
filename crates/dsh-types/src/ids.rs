@@ -1,5 +1,7 @@
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 /// 标识符校验错误。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdError {
@@ -26,7 +28,8 @@ impl fmt::Display for IdError {
 impl std::error::Error for IdError {}
 
 /// 受限标识符：1..=128 字节，仅允许字母、数字与 `._:-`。
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct Id(String);
 
 impl Id {
@@ -66,6 +69,20 @@ impl AsRef<str> for Id {
     }
 }
 
+impl TryFrom<String> for Id {
+    type Error = IdError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::parse(value)
+    }
+}
+
+impl From<Id> for String {
+    fn from(value: Id) -> Self {
+        value.0
+    }
+}
+
 /// Agent 标识。
 pub type AgentId = Id;
 /// 会话标识。
@@ -102,5 +119,16 @@ mod tests {
             Id::parse("bad id"),
             Err(IdError::InvalidChar(' '))
         ));
+    }
+
+    #[test]
+    fn serde_round_trips_and_validates() {
+        let id: Id = serde_json::from_str("\"agent-1\"").expect("valid id");
+        assert_eq!(id.as_str(), "agent-1");
+        assert!(serde_json::from_str::<Id>("\"bad id\"").is_err());
+        assert_eq!(
+            serde_json::to_string(&id).expect("serialize"),
+            "\"agent-1\""
+        );
     }
 }

@@ -1,7 +1,10 @@
 use std::fmt;
 
+use serde::{Deserialize, Serialize};
+
 /// 稳定错误码。字符串形式与契约中的 `code` 对应。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ErrorCode {
     /// 请求非法。
     InvalidRequest,
@@ -17,6 +20,8 @@ pub enum ErrorCode {
     Internal,
     /// 依赖暂不可用。
     Unavailable,
+    /// 上游响应非法。
+    InvalidResponse,
 }
 
 impl ErrorCode {
@@ -30,16 +35,26 @@ impl ErrorCode {
             Self::Cancelled => "cancelled",
             Self::Internal => "internal",
             Self::Unavailable => "unavailable",
+            Self::InvalidResponse => "invalid_response",
         }
     }
 }
 
 /// 运行时错误。消息文本不承诺稳定。
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Error {
+    /// 稳定错误码。
     code: ErrorCode,
+    /// 可读消息，不保证稳定。
     message: String,
+    /// 是否可重试。
+    #[serde(default, skip_serializing_if = "is_false")]
     retryable: bool,
+}
+
+const fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 impl Error {
@@ -93,5 +108,15 @@ mod tests {
         assert_eq!(error.message(), "timed out");
         assert!(error.is_retryable());
         assert_eq!(error.to_string(), "timeout: timed out");
+    }
+
+    #[test]
+    fn serializes_as_contract_error() {
+        let error = Error::new(ErrorCode::InvalidRequest, "bad input");
+        let json = serde_json::to_value(&error).expect("serialize");
+        assert_eq!(
+            json,
+            serde_json::json!({"code": "invalid_request", "message": "bad input"})
+        );
     }
 }

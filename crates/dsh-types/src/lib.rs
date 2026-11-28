@@ -11,7 +11,7 @@ pub mod tool;
 pub use content::ContentBlock;
 pub use error::{Error, ErrorCode};
 pub use ids::{AgentId, Id, IdError, RunId, SessionId, ToolCallId};
-pub use tool::{JsonSchema, ToolDescriptor};
+pub use tool::{JsonSchema, JsonValue, ToolCallRequest, ToolDescriptor};
 
 /// 当前契约草案版本，需与 `contracts/VERSION` 保持一致。
 pub const CONTRACT_VERSION: &str = "1.0.0-draft.1";
