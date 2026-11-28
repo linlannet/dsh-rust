@@ -1,11 +1,42 @@
 //! 运行注册、取消广播与会话占用。
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
 use dsh_domain::RunStatus;
 use dsh_types::{AgentId, Error, ErrorCode, RunId, SessionId};
 use tokio::sync::watch;
+
+/// 已结束运行的留存上限。
+const FINISHED_CAPACITY: usize = 1024;
+
+/// 已结束运行表：按登记顺序淘汰，只保留最近 [`FINISHED_CAPACITY`] 条。
+#[derive(Default)]
+struct FinishedRuns {
+    order: VecDeque<RunId>,
+    index: HashMap<RunId, (AgentId, RunStatus)>,
+}
+
+impl FinishedRuns {
+    fn insert(&mut self, run_id: RunId, agent_id: AgentId, status: RunStatus) {
+        if self
+            .index
+            .insert(run_id.clone(), (agent_id, status))
+            .is_none()
+        {
+            self.order.push_back(run_id);
+        }
+        while self.order.len() > FINISHED_CAPACITY {
+            if let Some(evicted) = self.order.pop_front() {
+                self.index.remove(&evicted);
+            }
+        }
+    }
+
+    fn get(&self, run_id: &RunId) -> Option<&(AgentId, RunStatus)> {
+        self.index.get(run_id)
+    }
+}
 
 /// 单个运行的句柄。
 struct RunHandle {
@@ -22,7 +53,7 @@ pub type RunHandleParts = (RunId, watch::Sender<bool>, Arc<Mutex<RunStatus>>);
 pub struct RunRegistry {
     runs: Mutex<HashMap<RunId, RunHandle>>,
     sessions: Mutex<HashSet<SessionId>>,
-    finished: Mutex<HashMap<RunId, (AgentId, RunStatus)>>,
+    finished: Mutex<FinishedRuns>,
     last_agent_run: Mutex<HashMap<AgentId, RunId>>,
 }
 
@@ -75,10 +106,7 @@ impl Drop for RunRegistration {
             sessions.remove(&self.session_id);
         }
         if let Ok(mut finished) = self.registry.finished.lock() {
-            if finished.len() > 1024 {
-                finished.clear();
-            }
-            finished.insert(self.run_id.clone(), (self.agent_id.clone(), status));
+            finished.insert(self.run_id.clone(), self.agent_id.clone(), status);
         }
         if let Ok(mut last) = self.registry.last_agent_run.lock() {
             last.insert(self.agent_id.clone(), self.run_id.clone());
@@ -219,4 +247,72 @@ pub fn new_run_id() -> RunId {
         .unwrap_or(0);
     let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
     RunId::parse(format!("run-{millis}-{counter}")).expect("generated run id is valid")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn agent() -> AgentId {
+        AgentId::parse("agent-1").expect("valid")
+    }
+
+    fn session(index: usize) -> SessionId {
+        SessionId::parse(format!("sess-{index}")).expect("valid")
+    }
+
+    /// 登记并立即结束一次运行，返回其运行 ID。
+    fn finish_one(registry: &Arc<RunRegistry>, index: usize) -> RunId {
+        let agent = agent();
+        let session = session(index);
+        let (run_id, cancel, status) = registry.register(&agent, &session).expect("register");
+        let registration = registry.attach(agent, run_id.clone(), session, cancel, status);
+        drop(registration);
+        run_id
+    }
+
+    #[test]
+    fn finished_runs_keep_latest_1024() {
+        let registry = Arc::new(RunRegistry::default());
+        let run_ids: Vec<RunId> = (0..1100)
+            .map(|index| finish_one(&registry, index))
+            .collect();
+
+        let evicted = 1100 - FINISHED_CAPACITY;
+        for run_id in &run_ids[..evicted] {
+            assert!(
+                registry.cancel_run(run_id).is_err(),
+                "最旧的运行应被淘汰: {run_id}"
+            );
+        }
+        for run_id in &run_ids[evicted..] {
+            assert!(
+                registry.cancel_run(run_id).is_ok(),
+                "最新的运行应被保留: {run_id}"
+            );
+        }
+    }
+
+    #[test]
+    fn finished_run_reports_terminal_status() {
+        let registry = Arc::new(RunRegistry::default());
+        let agent = agent();
+        let session = session(0);
+        let (run_id, cancel, status) = registry.register(&agent, &session).expect("register");
+        {
+            let registration =
+                registry.attach(agent.clone(), run_id.clone(), session, cancel, status);
+            registration.set_status(RunStatus::Completed);
+        }
+
+        assert_eq!(
+            registry.cancel_run(&run_id).expect("by run"),
+            RunStatus::Completed
+        );
+        assert_eq!(
+            registry.cancel_agent(&agent).expect("by agent"),
+            RunStatus::Completed
+        );
+        assert!(registry.is_empty());
+    }
 }

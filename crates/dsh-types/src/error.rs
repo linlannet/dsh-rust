@@ -20,8 +20,12 @@ pub enum ErrorCode {
     Internal,
     /// 依赖暂不可用。
     Unavailable,
+    /// 存储暂不可用。
+    StorageUnavailable,
     /// 上游响应非法。
     InvalidResponse,
+    /// 单次运行的事件输出超出字节预算。
+    StreamBudgetExceeded,
 }
 
 impl ErrorCode {
@@ -35,7 +39,9 @@ impl ErrorCode {
             Self::Cancelled => "cancelled",
             Self::Internal => "internal",
             Self::Unavailable => "unavailable",
+            Self::StorageUnavailable => "storage_unavailable",
             Self::InvalidResponse => "invalid_response",
+            Self::StreamBudgetExceeded => "stream_budget_exceeded",
         }
     }
 }
@@ -118,5 +124,24 @@ mod tests {
             json,
             serde_json::json!({"code": "invalid_request", "message": "bad input"})
         );
+    }
+
+    #[test]
+    fn error_codes_use_contract_strings() {
+        let cases = [
+            (ErrorCode::InvalidRequest, "invalid_request"),
+            (ErrorCode::NotFound, "not_found"),
+            (ErrorCode::Conflict, "conflict"),
+            (ErrorCode::Timeout, "timeout"),
+            (ErrorCode::Cancelled, "cancelled"),
+            (ErrorCode::Internal, "internal"),
+            (ErrorCode::Unavailable, "unavailable"),
+            (ErrorCode::StorageUnavailable, "storage_unavailable"),
+            (ErrorCode::InvalidResponse, "invalid_response"),
+            (ErrorCode::StreamBudgetExceeded, "stream_budget_exceeded"),
+        ];
+        for (code, text) in cases {
+            assert_eq!(code.as_str(), text);
+        }
     }
 }

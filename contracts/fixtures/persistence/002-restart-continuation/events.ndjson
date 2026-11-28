@@ -1,0 +1,7 @@
+{"eventId":"evt-c1","sessionId":"sess-2","seq":1,"type":"session.created","timestamp":"2026-11-28T09:00:00Z","payload":{"agentId":"agent-1"}}
+{"eventId":"evt-c2","sessionId":"sess-2","seq":2,"type":"message.appended","timestamp":"2026-11-28T09:00:01Z","payload":{"messageId":"msg-c1","role":"user","content":[{"type":"text","text":"统计 rust go rust"}]}}
+{"eventId":"evt-c3","sessionId":"sess-2","seq":3,"type":"run.started","timestamp":"2026-11-28T09:00:02Z","payload":{"runId":"run-c1"}}
+{"eventId":"evt-c4","sessionId":"sess-2","seq":4,"type":"run.completed","timestamp":"2026-11-28T09:00:03Z","payload":{"runId":"run-c1","finishReason":"stop"}}
+{"eventId":"evt-c5","sessionId":"sess-2","seq":5,"type":"message.appended","timestamp":"2026-11-28T10:00:00Z","payload":{"messageId":"msg-c2","role":"user","content":[{"type":"text","text":"再加一个 go"}]}}
+{"eventId":"evt-c6","sessionId":"sess-2","seq":6,"type":"run.started","timestamp":"2026-11-28T10:00:01Z","payload":{"runId":"run-c2"}}
+{"eventId":"evt-c7","sessionId":"sess-2","seq":7,"type":"run.completed","timestamp":"2026-11-28T10:00:03Z","payload":{"runId":"run-c2","finishReason":"stop"}}

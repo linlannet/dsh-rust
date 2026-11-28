@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg)](#6-tech-stack)
 [![Edition](https://img.shields.io/badge/edition-2024-blue.svg)](#6-tech-stack)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](#9-roadmap)
+[![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)](#9-roadmap)
 
 ---
 
@@ -16,7 +16,7 @@
 
 A **Rust implementation of DeepSeek Harness**, aiming at a Rust reproduction where **everything is a plugin**, tracking the upstream project and the Java edition over time.
 
-Version `0.2.0` is the **first runnable release**: the HTTP/SSE service works, the minimal ReAct loop performs a real tool call, and output follows `contracts/v1`. The default FakeModel runs offline; the DeepSeek adapter is behind a feature flag.
+Version `0.2.1` adds **persistence and replay** on top of the 0.2.0 loop: sessions and events live in SQLite, a restarted process continues the same session, and events can be replayed page by page; streaming output is bounded by a byte budget.
 
 - **Port**: `127.0.0.1:8090` (override with `DSH_BIND_ADDR`)
 - **Contract version**: `1.0.0-draft.1` (independent from the product version, see `contracts/VERSION`)
@@ -46,16 +46,17 @@ All changes are recorded in [CHANGELOG](./CHANGELOG.md). This README keeps only 
 
 ## 1. Introduction
 
-0.2.0 delivers:
+0.2.1 delivers:
 
-- **Runnable HTTP service**: health, blocking message, SSE stream, cancel.
+- **Runnable HTTP service**: health, blocking message, SSE stream, cancel, session event replay.
 - **Minimal ReAct loop**: model step → tool call → observation → next step → stop; default max 8 steps.
+- **Persistence and continuation**: sessions and event logs in SQLite; the same `sessionId` keeps its history across restarts.
+- **Event replay**: six event families (`session.created` / `message.appended` / `run.started` / `tool.*` / `run.*`) paged by `seq`.
 - **Dual model path**: scriptable FakeModel (default) and DeepSeek Chat Completions adapter (`deepseek` feature).
 - **Built-in tools**: `echo`, `clock`, `read_file` (workspace sandbox, UTF-8, 256 KiB limit, 5s timeout).
-- **Contract-aligned SSE**: `chunk` / `tool_call` / `done` / `error`; increasing seq, single terminal event, keepalive excluded from seq.
-- **Contract replay**: 4 runtime-exported fixtures + replay tests; openapi generated from the route table and checked in CI.
+- **Contract-aligned SSE**: `chunk` / `tool_call` / `done` / `error`; increasing seq, single terminal event, keepalive excluded; oversize output ends with `stream_budget_exceeded`.
 
-Not included: plugin host, persistence, authentication, approvals, multi-tenancy (see `docs/0.2.0/spec.md` §8).
+Not included: plugin host, approvals, authentication, multi-tenancy (see `docs/0.2.1/spec.md` §8).
 
 ---
 
@@ -77,7 +78,7 @@ cargo run -p dsh-runtime
 Starts with FakeModel on `127.0.0.1:8090`:
 
 ```text
-INFO dsh_runtime: dsh-runtime starting bind=127.0.0.1:8090 model="fake" tools=3 contract="1.0.0-draft.1" version="0.2.0"
+INFO dsh_runtime: dsh-runtime starting bind=127.0.0.1:8090 model="fake" store="sqlite" db=./data/dsh-rust.db tools=3 stream_budget_bytes=8388608 contract="1.0.0-draft.1" version="0.2.1"
 ```
 
 ### 2.3 Examples
@@ -96,9 +97,11 @@ curl -sN -X POST http://127.0.0.1:8090/api/agent/stream \
 curl -s -X POST http://127.0.0.1:8090/api/agent/cancel \
   -H 'content-type: application/json' \
   -d '{"agentId":"agent-1","runId":"run-xxx"}'
+
+curl -s 'http://127.0.0.1:8090/api/sessions/sess-xxx/events?afterSeq=0&limit=200'
 ```
 
-Run with `DSH_FAKE_SCRIPT=tool` to trigger a `clock` tool call followed by a summary.
+Run with `DSH_FAKE_SCRIPT=tool` to trigger a `clock` tool call followed by a summary. Sessions and events go to `./data/dsh-rust.db` by default; set `DSH_STORE=memory` to fall back to in-memory only.
 
 ### 2.4 Configuration
 
@@ -114,6 +117,9 @@ Run with `DSH_FAKE_SCRIPT=tool` to trigger a `clock` tool call followed by a sum
 | `DSH_READ_FILE_MAX_BYTES` | `262144` | Read limit |
 | `DSH_MODEL_BASE_URL` | `https://api.deepseek.com` | deepseek only |
 | `DEEPSEEK_API_KEY` | none | deepseek only; startup fails if missing |
+| `DSH_STORE` | `sqlite` | `sqlite` / `memory`; `memory` is the rollback path |
+| `DSH_DB_PATH` | `./data/dsh-rust.db` | Database path; parent directory is created |
+| `DSH_STREAM_BUDGET_BYTES` | `8388608` | Per-run SSE byte budget |
 
 ```bash
 DEEPSEEK_API_KEY=... DSH_MODEL=deepseek cargo run -p dsh-runtime --features deepseek
@@ -166,8 +172,9 @@ Dependency direction: `http → case → domain → types`; `infra → domain`; 
 | POST | `/api/agent/message` | Blocking agent message |
 | POST | `/api/agent/stream` | SSE stream |
 | POST | `/api/agent/cancel` | Cancel by `runId` or `agentId` |
+| GET | `/api/sessions/{sessionId}/events` | Paged session events by `seq` (`afterSeq`/`limit`) |
 
-Error mapping: `invalid_request→400`, `not_found→404`, `conflict→409`, `timeout→504`, `unavailable→503`, `invalid_response→502`, `internal→500`; body `{code, message, retryable?, traceId?}`.
+Error mapping: `invalid_request→400`, `not_found→404`, `conflict→409`, `timeout→504`, `unavailable→503`, `storage_unavailable→503`, `invalid_response→502`, `internal→500`; body `{code, message, retryable?, traceId?}`.
 
 SSE rules: seq starts at 1 and increases; exactly one terminal event (`done` or `error`) appears last; keepalive is a comment and does not consume seq.
 
@@ -195,6 +202,7 @@ Change flow: schema → fixture → `dsh-types` → `contracts/CHANGELOG.md`.
 | Serialization | serde 1 + serde_json 1 |
 | Logging | tracing 0.1 + tracing-subscriber 0.3 |
 | DeepSeek | reqwest 0.12 (optional `deepseek` feature, rustls) |
+| Storage | rusqlite 0.40 (`bundled`, `dsh-infra` only) with a `spawn_blocking` bridge |
 | Contract tooling | Node.js + `contracts/tools/*.mjs` |
 
 ---
@@ -205,8 +213,8 @@ Change flow: schema → fixture → `dsh-types` → `contracts/CHANGELOG.md`.
 | --- | --- |
 | `cargo fmt --all --check` | Passing |
 | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | Passing |
-| `cargo test --workspace --all-features` | 51 passed |
-| `node contracts/tools/validate.mjs` | 29 schemas / 52 refs / 8 fixtures, 0 warnings |
+| `cargo test --workspace --all-features` | 87 passed |
+| `node contracts/tools/validate.mjs` | 31 schemas / 68 refs / 10 fixtures, 0 warnings |
 | `node contracts/tools/generate-openapi.mjs --check` | Passing |
 
 ---
@@ -214,10 +222,12 @@ Change flow: schema → fixture → `dsh-types` → `contracts/CHANGELOG.md`.
 ## 8. Documentation
 
 - `docs/0.1.0/`: skeleton release four-piece set
-- `docs/0.2.0/spec.md`: HTTP + minimal ReAct requirements
-- `docs/0.2.0/design.md`: layering, interfaces, choices, risks
-- `docs/0.2.0/tasks.md`: coding tasks and status
-- `docs/0.2.0/release-v0.2.0-development-notes.md`: verification and limitations
+- `docs/0.2.0/`: HTTP + minimal ReAct four-piece set
+- `docs/0.2.1/spec.md`: persistence and replay requirements
+- `docs/0.2.1/design.md`: storage choices, event model, blocking bridge, risks
+- `docs/0.2.1/tasks.md`: coding tasks and status
+- `docs/0.2.1/release-notes-v0.2.1.md` / `release-notes-v0.2.1.en.md`: user-facing release notes (features, behavior changes, upgrade guide)
+- `docs/0.2.1/release-v0.2.1-development-notes.md`: verification and limitations
 - `contracts/README.md`: contract layout and recording flow
 - `AGENTS.md` / `llms.txt`: AI entries
 
@@ -229,5 +239,7 @@ Change flow: schema → fixture → `dsh-types` → `contracts/CHANGELOG.md`.
 | --- | --- | --- |
 | 0.1.0 | Skeleton and contract baseline | Layering, types, use cases, constants, in-memory repo, CI |
 | 0.2.0 | Runnable HTTP + minimal ReAct loop | Axum/Tokio, SSE, tools, Fake/DeepSeek, contract replay |
-| 0.2.1 | Plugin host and persistence | Plugin manifest/host, session event persistence and replay |
+| 0.2.1 | Persistence and replay | Session/event storage on SQLite, restart continuation, event replay endpoint, SSE output budget |
+| 0.2.2 | Plugin host | Plugin manifest/host, stdio JSON-RPC against the Java host |
+| 0.2.3 | Approval and permission matrix | Tool policy, approval events, run suspension |
 | Later | Align with upstream capabilities | Follow upstream and dsh-java upgrade items release by release |

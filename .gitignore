@@ -26,3 +26,9 @@ rustc-ice-*.txt
 # macOS
 .DS_Store
 .idea/
+
+# 运行时数据库与 WAL（契约要求不入版本库）
+data/
+*.db
+*.db-wal
+*.db-shm

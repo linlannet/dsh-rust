@@ -1,0 +1,17 @@
+{
+  "scenario": "persistence/002-restart-continuation",
+  "contracts": {
+    "event": "v1/persistence/session-event.schema.json"
+  },
+  "origin": "handwritten-sample",
+  "recorded": false,
+  "capturedAt": null,
+  "source": {
+    "repo": null,
+    "commit": null,
+    "endpoint": "session event log"
+  },
+  "normalized": ["eventId", "timestamp", "sessionId"],
+  "redacted": [],
+  "notes": "重启续跑：第二轮事件（seq 4-6）在进程重启后追加，seq 从历史最大值继续，不从 1 重来。"
+}

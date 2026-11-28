@@ -99,6 +99,33 @@
         "rust"
       ],
       "status": "runtime-export"
+    },
+    {
+      "id": "http.session-events.001-replay-page",
+      "path": "http/session-events/001-replay-page",
+      "tags": [
+        "http",
+        "persistence",
+        "replay"
+      ],
+      "appliesTo": [
+        "java",
+        "rust"
+      ],
+      "status": "handwritten-sample"
+    },
+    {
+      "id": "persistence.session.002-restart-continuation",
+      "path": "persistence/002-restart-continuation",
+      "tags": [
+        "persistence",
+        "continuation"
+      ],
+      "appliesTo": [
+        "java",
+        "rust"
+      ],
+      "status": "handwritten-sample"
     }
   ]
 }

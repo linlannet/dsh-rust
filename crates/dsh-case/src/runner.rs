@@ -6,13 +6,17 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use dsh_domain::{
-    ChatMessage, FinishReason, ModelPort, ModelRequest, ModelStep, Role, RunEvent, RunStatus,
-    Session, SessionRepository, Tool, ToolCallStatus, Usage,
+    ChatMessage, EventLog, FinishReason, ModelPort, ModelRequest, ModelStep, Role, RunEvent,
+    RunStatus, Session, SessionRepository, Tool, ToolCallStatus, Usage,
 };
-use dsh_types::{AgentId, ContentBlock, Error, ErrorCode, JsonValue, RunId, SessionId};
+use dsh_types::{
+    AgentId, ContentBlock, Error, ErrorCode, JsonValue, RunId, SessionEvent, SessionId, event_type,
+    now_rfc3339,
+};
 
+use crate::blocking::block_on_store;
 use crate::event_sink::EventSink;
-use crate::run_registry::RunRegistry;
+use crate::run_registry::{RunRegistration, RunRegistry};
 use crate::tool_registry::ToolRegistry;
 
 /// 运行配置。
@@ -135,6 +139,7 @@ pub struct AgentService {
     model: Arc<dyn ModelPort>,
     tools: Arc<ToolRegistry>,
     sessions: Arc<dyn SessionRepository>,
+    events: Arc<dyn EventLog>,
     runs: Arc<RunRegistry>,
     config: RunnerConfig,
 }
@@ -145,6 +150,7 @@ impl AgentService {
         model: Arc<dyn ModelPort>,
         tools: Arc<ToolRegistry>,
         sessions: Arc<dyn SessionRepository>,
+        events: Arc<dyn EventLog>,
         runs: Arc<RunRegistry>,
         config: RunnerConfig,
     ) -> Self {
@@ -152,6 +158,7 @@ impl AgentService {
             model,
             tools,
             sessions,
+            events,
             runs,
             config,
         }
@@ -173,6 +180,9 @@ impl AgentService {
     }
 
     /// 执行一次运行，并将事件写入 sink。
+    ///
+    /// 事件按 run 聚合后批量落库：开始时一次事务（会话创建/用户消息/运行开始），
+    /// 结束时一次事务（工具调用、助手消息与终态），单 run 至多 2 次事务。
     pub async fn run(
         &self,
         request: RunRequest,
@@ -196,40 +206,63 @@ impl AgentService {
         registration.set_status(RunStatus::Running);
         let mut signal = registration.signal();
 
-        let mut session = match self.sessions.load(&session_id)? {
-            Some(session) => session,
-            None => Session::new(session_id.clone()),
+        let mut events = EventBuffer::new(session_id.clone());
+
+        let (mut session, is_new) = match self.load_session(&session_id).await? {
+            Some(session) => (session, false),
+            None => (Session::new(session_id.clone()), true),
         };
+        if is_new {
+            events.push(
+                event_type::SESSION_CREATED,
+                serde_json::json!({"agentId": request.agent_id.as_str()}),
+            );
+        }
         session.active_run = Some(run_id.clone());
 
+        let message_id = next_message_id();
         let mut messages = session.messages.clone();
-        messages.push(ChatMessage {
+        let user_message = ChatMessage {
             role: Role::User,
             content: request.content.clone(),
-        });
+        };
+        events.push(
+            event_type::MESSAGE_APPENDED,
+            message_payload(&message_id, "user", &user_message.content),
+        );
+        messages.push(user_message);
+        events.push(
+            event_type::RUN_STARTED,
+            serde_json::json!({"runId": run_id.as_str()}),
+        );
 
-        let message_id = next_message_id();
+        // 事务 1：会话创建、用户消息与运行开始
+        self.flush_events(events.take(), sink, &trace_id).await;
+
         let mut text = String::new();
         let mut records: Vec<ToolCallRecord> = Vec::new();
         let mut duplicates: HashMap<String, u32> = HashMap::new();
         let mut finish_reason = FinishReason::Length;
 
         for step in 1..=self.config.max_steps {
-            if *signal.borrow() {
-                finish_reason = FinishReason::Cancelled;
-                registration.set_status(RunStatus::Cancelled);
-                emit_done(sink, finish_reason, None);
-                persist(self.sessions.as_ref(), &mut session, &messages);
-                return Ok(outcome(
-                    run_id,
-                    session_id,
-                    text,
-                    records,
-                    finish_reason,
-                    RunStatus::Cancelled,
-                    None,
-                    None,
-                ));
+            let cancelled = *signal.borrow();
+            if cancelled {
+                return Ok(self
+                    .finish_run(
+                        &registration,
+                        sink,
+                        &trace_id,
+                        &mut events,
+                        &mut session,
+                        &messages,
+                        run_id,
+                        session_id,
+                        text,
+                        records,
+                        FinishReason::Cancelled,
+                        None,
+                    )
+                    .await);
             }
 
             let model_request = ModelRequest {
@@ -246,59 +279,61 @@ impl AgentService {
             };
 
             let Some(step_result) = step_result else {
-                finish_reason = FinishReason::Cancelled;
-                registration.set_status(RunStatus::Cancelled);
-                emit_done(sink, finish_reason, None);
-                persist(self.sessions.as_ref(), &mut session, &messages);
-                return Ok(outcome(
-                    run_id,
-                    session_id,
-                    text,
-                    records,
-                    finish_reason,
-                    RunStatus::Cancelled,
-                    None,
-                    None,
-                ));
+                return Ok(self
+                    .finish_run(
+                        &registration,
+                        sink,
+                        &trace_id,
+                        &mut events,
+                        &mut session,
+                        &messages,
+                        run_id,
+                        session_id,
+                        text,
+                        records,
+                        FinishReason::Cancelled,
+                        None,
+                    )
+                    .await);
             };
 
             let model_step = match step_result {
                 Err(_) => {
                     let error = Error::new(ErrorCode::Timeout, "model step timed out");
-                    registration.set_status(RunStatus::Failed);
-                    sink.emit(RunEvent::Error {
-                        error: error.clone(),
-                        trace_id: trace_id.clone(),
-                    });
-                    persist(self.sessions.as_ref(), &mut session, &messages);
-                    return Ok(outcome(
-                        run_id,
-                        session_id,
-                        text,
-                        records,
-                        FinishReason::Error,
-                        RunStatus::Failed,
-                        Some(error),
-                        None,
-                    ));
+                    return Ok(self
+                        .finish_run(
+                            &registration,
+                            sink,
+                            &trace_id,
+                            &mut events,
+                            &mut session,
+                            &messages,
+                            run_id,
+                            session_id,
+                            text,
+                            records,
+                            FinishReason::Error,
+                            Some(error),
+                        )
+                        .await);
                 }
                 Ok(Err(error)) => {
-                    registration.set_status(RunStatus::Failed);
-                    sink.emit(RunEvent::Error {
-                        error: error.clone(),
-                        trace_id: trace_id.clone(),
-                    });
-                    persist(self.sessions.as_ref(), &mut session, &messages);
-                    return Ok(outcome(
-                        run_id,
-                        session_id,
-                        text,
-                        records,
-                        FinishReason::Error,
-                        RunStatus::Failed,
-                        Some(error),
-                        None,
-                    ));
+                    return Ok(self
+                        .finish_run(
+                            &registration,
+                            sink,
+                            &trace_id,
+                            &mut events,
+                            &mut session,
+                            &messages,
+                            run_id,
+                            session_id,
+                            text,
+                            records,
+                            FinishReason::Error,
+                            Some(error),
+                        )
+                        .await);
                 }
                 Ok(Ok(step)) => step,
             };
@@ -310,7 +345,12 @@ impl AgentService {
                         message_id: message_id.clone(),
                         delta: delta.clone(),
                     });
-                    messages.push(ChatMessage::text(Role::Assistant, delta));
+                    let message = ChatMessage::text(Role::Assistant, delta);
+                    events.push(
+                        event_type::MESSAGE_APPENDED,
+                        message_payload(&message_id, "assistant", &message.content),
+                    );
+                    messages.push(message);
                     finish_reason = FinishReason::Stop;
                     break;
                 }
@@ -321,7 +361,12 @@ impl AgentService {
                             message_id: message_id.clone(),
                             delta: lead.clone(),
                         });
-                        messages.push(ChatMessage::text(Role::Assistant, lead));
+                        let message = ChatMessage::text(Role::Assistant, lead);
+                        events.push(
+                            event_type::MESSAGE_APPENDED,
+                            message_payload(&message_id, "assistant", &message.content),
+                        );
+                        messages.push(message);
                     }
 
                     for call in calls {
@@ -333,22 +378,22 @@ impl AgentService {
                                 ErrorCode::Conflict,
                                 format!("repeated tool call detected: {}", call.name),
                             );
-                            registration.set_status(RunStatus::Failed);
-                            sink.emit(RunEvent::Error {
-                                error: error.clone(),
-                                trace_id: trace_id.clone(),
-                            });
-                            persist(self.sessions.as_ref(), &mut session, &messages);
-                            return Ok(outcome(
-                                run_id,
-                                session_id,
-                                text,
-                                records,
-                                FinishReason::Error,
-                                RunStatus::Failed,
-                                Some(error),
-                                None,
-                            ));
+                            return Ok(self
+                                .finish_run(
+                                    &registration,
+                                    sink,
+                                    &trace_id,
+                                    &mut events,
+                                    &mut session,
+                                    &messages,
+                                    run_id,
+                                    session_id,
+                                    text,
+                                    records,
+                                    FinishReason::Error,
+                                    Some(error),
+                                )
+                                .await);
                         }
 
                         sink.emit(RunEvent::ToolCall {
@@ -359,6 +404,14 @@ impl AgentService {
                             result: None,
                             error: None,
                         });
+                        events.push(
+                            event_type::TOOL_REQUESTED,
+                            serde_json::json!({
+                                "toolCallId": call.tool_call_id,
+                                "name": call.name,
+                                "arguments": call.arguments,
+                            }),
+                        );
 
                         let execution = match self.tools.get(&call.name) {
                             Some(tool) => {
@@ -381,7 +434,19 @@ impl AgentService {
                                     result: Some(result.clone()),
                                     error: None,
                                 });
-                                messages.push(ChatMessage::text(Role::Tool, result.to_string()));
+                                events.push(
+                                    event_type::TOOL_COMPLETED,
+                                    serde_json::json!({
+                                        "toolCallId": call.tool_call_id,
+                                        "isError": false,
+                                    }),
+                                );
+                                let message = ChatMessage::text(Role::Tool, result.to_string());
+                                events.push(
+                                    event_type::MESSAGE_APPENDED,
+                                    message_payload(&next_message_id(), "tool", &message.content),
+                                );
+                                messages.push(message);
                                 records.push(ToolCallRecord {
                                     tool_call_id: call.tool_call_id.clone(),
                                     name: call.name.clone(),
@@ -400,10 +465,22 @@ impl AgentService {
                                     result: None,
                                     error: Some(error.clone()),
                                 });
-                                messages.push(ChatMessage::text(
+                                events.push(
+                                    event_type::TOOL_COMPLETED,
+                                    serde_json::json!({
+                                        "toolCallId": call.tool_call_id,
+                                        "isError": true,
+                                    }),
+                                );
+                                let message = ChatMessage::text(
                                     Role::Tool,
                                     format!("tool error: {}", error.message()),
-                                ));
+                                );
+                                events.push(
+                                    event_type::MESSAGE_APPENDED,
+                                    message_payload(&next_message_id(), "tool", &message.content),
+                                );
+                                messages.push(message);
                                 records.push(ToolCallRecord {
                                     tool_call_id: call.tool_call_id.clone(),
                                     name: call.name.clone(),
@@ -423,19 +500,177 @@ impl AgentService {
             }
         }
 
-        registration.set_status(RunStatus::Completed);
-        emit_done(sink, finish_reason, None);
-        persist(self.sessions.as_ref(), &mut session, &messages);
-        Ok(outcome(
+        Ok(self
+            .finish_run(
+                &registration,
+                sink,
+                &trace_id,
+                &mut events,
+                &mut session,
+                &messages,
+                run_id,
+                session_id,
+                text,
+                records,
+                finish_reason,
+                None,
+            )
+            .await)
+    }
+
+    /// 读取会话事件分页。
+    ///
+    /// 会话不存在时返回 `not_found`，避免客户端把「无事件」与「无会话」混淆。
+    pub async fn session_events(
+        &self,
+        session_id: &SessionId,
+        after_seq: u64,
+        limit: usize,
+    ) -> Result<Vec<SessionEvent>, Error> {
+        let sessions = Arc::clone(&self.sessions);
+        let lookup = session_id.clone();
+        if block_on_store(move || sessions.load(&lookup))
+            .await?
+            .is_none()
+        {
+            return Err(Error::new(
+                ErrorCode::NotFound,
+                format!("session not found: {session_id}"),
+            ));
+        }
+
+        let log = Arc::clone(&self.events);
+        let target = session_id.clone();
+        block_on_store(move || log.list_after(&target, after_seq, limit)).await
+    }
+
+    /// 读取会话；不存在的会话返回 `None`。
+    async fn load_session(&self, session_id: &SessionId) -> Result<Option<Session>, Error> {
+        let sessions = Arc::clone(&self.sessions);
+        let session_id = session_id.clone();
+        block_on_store(move || sessions.load(&session_id)).await
+    }
+
+    /// 保存会话投影；失败只记日志，不影响运行结论。
+    async fn persist(&self, session: &mut Session, messages: &[ChatMessage]) {
+        session.messages = messages.to_vec();
+        session.active_run = None;
+
+        let sessions = Arc::clone(&self.sessions);
+        let snapshot = session.clone();
+        if let Err(error) = block_on_store(move || sessions.save(&snapshot)).await {
+            tracing::warn!(
+                code = error.code().as_str(),
+                reason = error.message(),
+                "会话写入失败"
+            );
+        }
+    }
+
+    /// 批量写入事件；失败降级为一条 `Error` 事件，不改变运行结论。
+    async fn flush_events(
+        &self,
+        events: Vec<SessionEvent>,
+        sink: &dyn EventSink,
+        trace_id: &Option<String>,
+    ) {
+        if events.is_empty() {
+            return;
+        }
+        let log = Arc::clone(&self.events);
+        if let Err(error) = block_on_store(move || log.append_many(events)).await {
+            tracing::warn!(
+                code = error.code().as_str(),
+                reason = error.message(),
+                "会话事件写入失败"
+            );
+            sink.emit(RunEvent::Error {
+                error,
+                trace_id: trace_id.clone(),
+            });
+        }
+    }
+
+    /// 收尾：写终态、持久化会话并返回运行结果。
+    #[allow(clippy::too_many_arguments)]
+    async fn finish_run(
+        &self,
+        registration: &RunRegistration,
+        sink: &dyn EventSink,
+        trace_id: &Option<String>,
+        events: &mut EventBuffer,
+        session: &mut Session,
+        messages: &[ChatMessage],
+        run_id: RunId,
+        session_id: SessionId,
+        text: String,
+        records: Vec<ToolCallRecord>,
+        finish_reason: FinishReason,
+        error: Option<Error>,
+    ) -> RunOutcome {
+        let status = match (&error, finish_reason) {
+            (Some(_), _) => RunStatus::Failed,
+            (None, FinishReason::Cancelled) => RunStatus::Cancelled,
+            (None, _) => RunStatus::Completed,
+        };
+        registration.set_status(status);
+
+        match &error {
+            Some(error) => {
+                sink.emit(RunEvent::Error {
+                    error: error.clone(),
+                    trace_id: trace_id.clone(),
+                });
+                events.push(
+                    event_type::RUN_FAILED,
+                    serde_json::json!({"runId": run_id.as_str(), "error": error}),
+                );
+            }
+            None if status == RunStatus::Cancelled => {
+                sink.emit(RunEvent::Done {
+                    finish_reason,
+                    usage: None,
+                });
+                events.push(
+                    event_type::RUN_FAILED,
+                    serde_json::json!({
+                        "runId": run_id.as_str(),
+                        "error": {
+                            "code": ErrorCode::Cancelled.as_str(),
+                            "message": "run cancelled",
+                        },
+                    }),
+                );
+            }
+            None => {
+                sink.emit(RunEvent::Done {
+                    finish_reason,
+                    usage: None,
+                });
+                events.push(
+                    event_type::RUN_COMPLETED,
+                    serde_json::json!({
+                        "runId": run_id.as_str(),
+                        "finishReason": finish_reason.as_str(),
+                    }),
+                );
+            }
+        }
+
+        self.persist(session, messages).await;
+        // 事务 2：工具调用、助手消息与终态
+        self.flush_events(events.take(), sink, trace_id).await;
+
+        outcome(
             run_id,
             session_id,
             text,
             records,
             finish_reason,
-            RunStatus::Completed,
+            status,
+            error,
             None,
-            None,
-        ))
+        )
     }
 
     /// 取消指定运行。
@@ -463,17 +698,41 @@ async fn execute_tool(
     }
 }
 
-fn emit_done(sink: &dyn EventSink, finish_reason: FinishReason, usage: Option<Usage>) {
-    sink.emit(RunEvent::Done {
-        finish_reason,
-        usage,
-    });
+/// 单次运行的事件缓冲。
+///
+/// 事件先聚合在内存，按 run 分两次事务落库，避免 ReAct 循环逐步写放大。
+struct EventBuffer {
+    session_id: SessionId,
+    events: Vec<SessionEvent>,
 }
 
-fn persist(sessions: &dyn SessionRepository, session: &mut Session, messages: &[ChatMessage]) {
-    session.messages = messages.to_vec();
-    session.active_run = None;
-    let _ = sessions.save(session);
+impl EventBuffer {
+    fn new(session_id: SessionId) -> Self {
+        Self {
+            session_id,
+            events: Vec::new(),
+        }
+    }
+
+    fn push(&mut self, event_type: &str, payload: JsonValue) {
+        self.events.push(
+            SessionEvent::pending(self.session_id.clone(), event_type, now_rfc3339())
+                .with_payload(payload),
+        );
+    }
+
+    fn take(&mut self) -> Vec<SessionEvent> {
+        std::mem::take(&mut self.events)
+    }
+}
+
+/// 构造 `message.appended` 载荷。
+fn message_payload(message_id: &str, role: &str, content: &[ContentBlock]) -> JsonValue {
+    serde_json::json!({
+        "messageId": message_id,
+        "role": role,
+        "content": serde_json::to_value(content).unwrap_or(JsonValue::Null),
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -516,13 +775,16 @@ fn new_session_id() -> SessionId {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
-    use dsh_domain::{BoxFuture, ModelRequest, ModelStep, Role};
-    use dsh_infra::{ClockTool, EchoTool, FakeModel, FakeScript, InMemorySessionRepository};
-    use dsh_types::{Error, ErrorCode, JsonValue, ToolCallRequest};
+    use dsh_domain::{BoxFuture, EventLog, ModelRequest, ModelStep, Role};
+    use dsh_infra::{
+        ClockTool, EchoTool, FakeModel, FakeScript, InMemorySessionEventLog,
+        InMemorySessionRepository,
+    };
+    use dsh_types::{Error, ErrorCode, JsonValue, SessionEvent, ToolCallRequest, event_type};
 
     use super::*;
     use crate::event_sink::CollectSink;
@@ -535,9 +797,10 @@ mod tests {
         Arc::new(registry)
     }
 
-    fn service(
+    fn service_with_log(
         model: Arc<dyn ModelPort>,
         max_steps: usize,
+        events: Arc<dyn EventLog>,
     ) -> (Arc<AgentService>, Arc<InMemorySessionRepository>) {
         let sessions = Arc::new(InMemorySessionRepository::default());
         let runs = Arc::new(RunRegistry::default());
@@ -545,6 +808,7 @@ mod tests {
             model,
             registry(),
             sessions.clone(),
+            events,
             runs,
             RunnerConfig {
                 max_steps,
@@ -553,6 +817,17 @@ mod tests {
             },
         );
         (Arc::new(service), sessions)
+    }
+
+    fn service(
+        model: Arc<dyn ModelPort>,
+        max_steps: usize,
+    ) -> (Arc<AgentService>, Arc<InMemorySessionRepository>) {
+        service_with_log(
+            model,
+            max_steps,
+            Arc::new(InMemorySessionEventLog::default()),
+        )
     }
 
     fn agent() -> AgentId {
@@ -925,6 +1200,226 @@ mod tests {
         assert_eq!(
             outcome.tool_calls[0].error.as_ref().map(Error::code),
             Some(ErrorCode::InvalidRequest)
+        );
+    }
+
+    #[tokio::test]
+    async fn tool_run_records_complete_event_sequence() {
+        let log = Arc::new(InMemorySessionEventLog::default());
+        let (service, _sessions) =
+            service_with_log(Arc::new(FakeModel::new(FakeScript::Tool)), 4, log.clone());
+
+        let outcome = service
+            .run(
+                RunRequest::new(agent(), "time"),
+                &CollectSink::default(),
+                None,
+            )
+            .await
+            .expect("run");
+
+        let events = log.list_after(&outcome.session_id, 0, 100).expect("list");
+        let types: Vec<&str> = events
+            .iter()
+            .map(|event| event.event_type.as_str())
+            .collect();
+        assert_eq!(
+            types,
+            vec![
+                event_type::SESSION_CREATED,
+                event_type::MESSAGE_APPENDED,
+                event_type::RUN_STARTED,
+                event_type::TOOL_REQUESTED,
+                event_type::TOOL_COMPLETED,
+                event_type::MESSAGE_APPENDED,
+                event_type::MESSAGE_APPENDED,
+                event_type::RUN_COMPLETED,
+            ]
+        );
+        assert_eq!(
+            events.iter().map(|event| event.seq).collect::<Vec<_>>(),
+            (1..=8).collect::<Vec<_>>(),
+            "seq 连续且从 1 开始"
+        );
+
+        let requested = &events[3];
+        assert_eq!(requested.payload["name"], "clock");
+        let completed = &events[4];
+        assert_eq!(completed.payload["isError"], false);
+        assert_eq!(events[7].payload["finishReason"], "stop");
+    }
+
+    #[tokio::test]
+    async fn event_write_failure_keeps_run_conclusion() {
+        struct FailingLog;
+
+        impl EventLog for FailingLog {
+            fn append(&self, _event: SessionEvent) -> Result<SessionEvent, Error> {
+                Err(Error::new(
+                    ErrorCode::StorageUnavailable,
+                    "event log unavailable",
+                ))
+            }
+
+            fn list_after(
+                &self,
+                _session_id: &SessionId,
+                _after_seq: u64,
+                _limit: usize,
+            ) -> Result<Vec<SessionEvent>, Error> {
+                Ok(Vec::new())
+            }
+
+            fn last_seq(&self, _session_id: &SessionId) -> Result<u64, Error> {
+                Ok(0)
+            }
+        }
+
+        let (service, _sessions) = service_with_log(
+            Arc::new(FakeModel::new(FakeScript::Echo)),
+            4,
+            Arc::new(FailingLog),
+        );
+        let sink = CollectSink::default();
+
+        let outcome = service
+            .run(RunRequest::new(agent(), "hi"), &sink, None)
+            .await
+            .expect("run");
+
+        assert_eq!(outcome.text, "echo: hi", "事件写入失败不影响正文");
+        assert_eq!(outcome.finish_reason, FinishReason::Stop);
+        assert_eq!(outcome.status, RunStatus::Completed);
+        assert!(sink.events().iter().any(|event| matches!(
+            event,
+            RunEvent::Error { error, .. } if error.code() == ErrorCode::StorageUnavailable
+        )));
+    }
+
+    #[tokio::test]
+    async fn events_are_written_in_at_most_two_batches() {
+        struct CountingLog {
+            inner: InMemorySessionEventLog,
+            batches: AtomicUsize,
+        }
+
+        impl EventLog for CountingLog {
+            fn append(&self, event: SessionEvent) -> Result<SessionEvent, Error> {
+                self.inner.append(event)
+            }
+
+            fn append_many(&self, events: Vec<SessionEvent>) -> Result<Vec<SessionEvent>, Error> {
+                self.batches.fetch_add(1, Ordering::Relaxed);
+                self.inner.append_many(events)
+            }
+
+            fn list_after(
+                &self,
+                session_id: &SessionId,
+                after_seq: u64,
+                limit: usize,
+            ) -> Result<Vec<SessionEvent>, Error> {
+                self.inner.list_after(session_id, after_seq, limit)
+            }
+
+            fn last_seq(&self, session_id: &SessionId) -> Result<u64, Error> {
+                self.inner.last_seq(session_id)
+            }
+        }
+
+        let log = Arc::new(CountingLog {
+            inner: InMemorySessionEventLog::default(),
+            batches: AtomicUsize::new(0),
+        });
+        let (service, _sessions) =
+            service_with_log(Arc::new(FakeModel::new(FakeScript::Tool)), 4, log.clone());
+
+        let outcome = service
+            .run(
+                RunRequest::new(agent(), "time"),
+                &CollectSink::default(),
+                None,
+            )
+            .await
+            .expect("run");
+
+        assert!(
+            log.batches.load(Ordering::Relaxed) <= 2,
+            "单 run 事件写入至多 2 次事务"
+        );
+        assert_eq!(
+            log.inner
+                .list_after(&outcome.session_id, 0, 100)
+                .expect("list")
+                .len(),
+            8,
+            "批量写入不丢事件"
+        );
+    }
+
+    #[tokio::test]
+    async fn resumed_session_sees_first_round_content() {
+        struct HistoryModel {
+            seen: Mutex<Vec<Vec<String>>>,
+        }
+
+        impl ModelPort for HistoryModel {
+            fn step<'a>(
+                &'a self,
+                request: ModelRequest,
+            ) -> BoxFuture<'a, Result<ModelStep, Error>> {
+                let texts: Vec<String> =
+                    request.messages.iter().map(ChatMessage::as_text).collect();
+                Box::pin(async move {
+                    let round = {
+                        let mut seen = self.seen.lock().expect("lock");
+                        seen.push(texts);
+                        seen.len()
+                    };
+                    Ok(ModelStep::Text {
+                        delta: format!("round-{round}"),
+                    })
+                })
+            }
+
+            fn name(&self) -> &'static str {
+                "history"
+            }
+        }
+
+        let model = Arc::new(HistoryModel {
+            seen: Mutex::new(Vec::new()),
+        });
+        let (service, _sessions) = service(model.clone(), 2);
+
+        let first = service
+            .run(
+                RunRequest::new(agent(), "one"),
+                &CollectSink::default(),
+                None,
+            )
+            .await
+            .expect("first");
+        let second = service
+            .run(
+                RunRequest::with_content(
+                    agent(),
+                    Some(first.session_id.clone()),
+                    vec![ContentBlock::text("two")],
+                ),
+                &CollectSink::default(),
+                None,
+            )
+            .await
+            .expect("second");
+
+        assert_eq!(second.text, "round-2");
+        let seen = model.seen.lock().expect("lock");
+        assert_eq!(seen.len(), 2);
+        assert_eq!(
+            seen[1],
+            vec!["one".to_owned(), "round-1".to_owned(), "two".to_owned()],
+            "第二轮模型请求应包含首轮的用户与助手消息"
         );
     }
 }

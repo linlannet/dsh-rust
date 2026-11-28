@@ -4,12 +4,13 @@ mod config;
 
 use std::sync::Arc;
 
-use config::{Config, ModelChoice};
+use config::{Config, ModelChoice, StoreKind};
 use dsh_case::{AgentService, RunRegistry, RunnerConfig, ToolRegistry};
-use dsh_domain::{ModelPort, Tool};
+use dsh_domain::{EventLog, ModelPort, SessionRepository, Tool};
 use dsh_http::AppState;
 use dsh_infra::{
-    ClockTool, FakeModel, FakeScript, InMemorySessionRepository, ReadFileSandbox, ReadFileTool,
+    ClockTool, FakeModel, FakeScript, InMemorySessionEventLog, InMemorySessionRepository,
+    ReadFileSandbox, ReadFileTool, SqliteEventLog, SqliteSessionRepository, SqliteStore,
 };
 use dsh_types::CONTRACT_VERSION;
 
@@ -39,33 +40,69 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     registry.register(Arc::new(ReadFileTool::new(sandbox)) as Arc<dyn Tool>);
     let tools = Arc::new(registry);
 
-    let sessions = Arc::new(InMemorySessionRepository::default());
+    let (sessions, events): (Arc<dyn SessionRepository>, Arc<dyn EventLog>) =
+        match config.store_kind {
+            StoreKind::Sqlite => {
+                // 打开即建目录并执行迁移，失败直接以非零码退出
+                let store = Arc::new(SqliteStore::open(&config.db_path).map_err(|error| {
+                    format!(
+                        "failed to open database {}: {error}",
+                        config.db_path.display()
+                    )
+                })?);
+                (
+                    Arc::new(SqliteSessionRepository::new(Arc::clone(&store))),
+                    Arc::new(SqliteEventLog::new(store)),
+                )
+            }
+            StoreKind::Memory => (
+                Arc::new(InMemorySessionRepository::default()),
+                Arc::new(InMemorySessionEventLog::default()),
+            ),
+        };
+
     let runs = Arc::new(RunRegistry::default());
-    let service = AgentService::new(
+    let service = Arc::new(AgentService::new(
         model,
         tools.clone(),
         sessions,
+        events,
         runs,
         RunnerConfig {
             max_steps: config.max_steps,
             tool_timeout: config.tool_timeout,
             model_timeout: config.model_timeout,
         },
-    );
-    let state = AppState::new(Arc::new(service));
+    ));
+    let state = AppState::new(Arc::clone(&service)).with_stream_budget(config.stream_budget_bytes);
 
     tracing::info!(
         bind = %config.bind_addr,
         model = config.model_name(),
+        store = config.store_name(),
+        db = %config.db_label(),
         tools = tools.len(),
+        stream_budget_bytes = config.stream_budget_bytes,
         contract = CONTRACT_VERSION,
         version = env!("CARGO_PKG_VERSION"),
         "dsh-runtime starting"
     );
 
-    let shutdown = async {
+    let shutdown_service = Arc::clone(&service);
+    let shutdown = async move {
         let _ = tokio::signal::ctrl_c().await;
         tracing::info!("shutdown signal received");
+        // 有限等待在途 run 结束，保证会话投影与事件在退出前写完
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !shutdown_service.runs().is_empty() && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        let pending = shutdown_service.runs().len();
+        if pending == 0 {
+            tracing::info!("shutdown drain complete");
+        } else {
+            tracing::warn!(pending, "shutdown drain timed out");
+        }
     };
     dsh_http::serve(&config.bind_addr, state, shutdown)
         .await

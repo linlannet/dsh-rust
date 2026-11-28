@@ -33,7 +33,10 @@ impl From<Error> for HttpError {
             ErrorCode::Timeout => StatusCode::GATEWAY_TIMEOUT,
             ErrorCode::Cancelled => StatusCode::CONFLICT,
             ErrorCode::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
+            ErrorCode::StorageUnavailable => StatusCode::SERVICE_UNAVAILABLE,
             ErrorCode::InvalidResponse => StatusCode::BAD_GATEWAY,
+            // 预算超限只会作为 SSE 终态出现，HTTP 状态仅作兜底
+            ErrorCode::StreamBudgetExceeded => StatusCode::INTERNAL_SERVER_ERROR,
             ErrorCode::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
         Self {

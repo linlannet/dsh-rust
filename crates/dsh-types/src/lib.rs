@@ -6,11 +6,15 @@
 pub mod content;
 pub mod error;
 pub mod ids;
+pub mod session_event;
+pub mod time;
 pub mod tool;
 
 pub use content::ContentBlock;
 pub use error::{Error, ErrorCode};
 pub use ids::{AgentId, Id, IdError, RunId, SessionId, ToolCallId};
+pub use session_event::{SessionEvent, event_type};
+pub use time::{format_rfc3339, now_rfc3339};
 pub use tool::{JsonSchema, JsonValue, ToolCallRequest, ToolDescriptor};
 
 /// 当前契约草案版本，需与 `contracts/VERSION` 保持一致。

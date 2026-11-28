@@ -2,6 +2,36 @@
 
 > 各版本详情见 `docs/<version>/release-v<version>-development-notes.md`；以下按 crate 与工程项记录变更。
 
+## 版本号：0.2.1
+- 更新日期：2026-11-28
+- 详情：docs/0.2.1/release-v0.2.1-development-notes.md
+- 契约版本：1.0.0-draft.1（独立于产品版本）
+
+- **新增**：
+  - **持久化**：新增 `EventLog` 端口（`append`/`append_many`/`list_after`/`last_seq`）与 SQLite 实现；会话投影、消息、事件与运行四表落 `DSH_DB_PATH`（默认 `./data/dsh-rust.db`）
+  - **事件回放**：`GET /api/sessions/{sessionId}/events`，支持 `afterSeq`/`limit`（默认 200、上限 1000），会话不存在返回 `not_found`
+  - **重启续跑**：进程重启后同一 `sessionId` 复用历史消息，事件 `seq` 跨重启接续
+  - **SSE 输出预算**：`DSH_STREAM_BUDGET_BYTES`（默认 8 MiB），超限以唯一终态 `error(stream_budget_exceeded)` 收尾
+  - **存储切换**：`DSH_STORE=sqlite|memory`，内存实现保留为回滚通道
+  - **契约**：新增 persistence schema/migration、回放端点 schema、错误码 `$defs/errorCode` 与 2 组 fixtures
+- **更新**：
+  - workspace 版本 `0.2.0` → `0.2.1`
+  - `dsh-case`：`AgentService` 注入 `EventLog` 并落 6 类事件；仓储与事件调用统一 `spawn_blocking`；`RunRegistry.finished` 改有序淘汰（保留最近 1024 条）
+  - `dsh-http`：`AppState` 增加 `stream_budget_bytes`；新增 `SESSIONS_EVENTS` 路由、DTO 与错误映射
+  - `dsh-infra`：新增 `SqliteStore`/`SqliteSessionRepository`/`SqliteEventLog`/`InMemorySessionEventLog`
+  - `dsh-types`：新增 `SessionEvent`、`event_type` 常量、`now_rfc3339`、`ErrorCode::StorageUnavailable`/`StreamBudgetExceeded`
+  - `dsh-runtime`：SQLite 装配、启动迁移、关闭前有限等待在途 run
+- **质量**：
+  - `cargo test --workspace --all-features` 87 passed
+  - `cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过
+  - 契约校验 31 schema / 68 refs / 10 fixtures / 0 warnings
+  - 新增内存 vs SQLite 事件序列差分测试与重启续跑集成测试
+- **破坏性变更**：
+  - `AgentService::new` 增加 `EventLog` 参数（`dsh-case`）
+  - `AppState` 增加 `stream_budget_bytes` 字段（`dsh-http`）
+  - 新增依赖 `rusqlite 0.40`（仅 `dsh-infra`）
+- **已知限制**：DeepSeek 未真实联调；工具超时后 `spawn_blocking` 任务不可取消；单 run 事件批量提交使中间事件延迟可回放；事件无留存治理；插件宿主与审批未接入
+
 ## 版本号：0.2.0
 - 更新日期：2026-11-27
 - 详情：docs/0.2.0/release-v0.2.0-development-notes.md

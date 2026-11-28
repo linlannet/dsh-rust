@@ -16,6 +16,8 @@ pub mod routes {
     pub const AGENT_STREAM: &str = "/api/agent/stream";
     /// 取消运行。
     pub const AGENT_CANCEL: &str = "/api/agent/cancel";
+    /// 会话事件回放。
+    pub const SESSIONS_EVENTS: &str = "/api/sessions/{session_id}/events";
     /// 安装插件。
     pub const PLUGIN_INSTALL: &str = "/api/harness/plugins/install";
     /// 激活插件。
@@ -29,7 +31,7 @@ pub const SSE_KEEPALIVE: &str = ":keepalive";
 
 pub use error::HttpError;
 pub use router::{AppState, build_router, serve};
-pub use sse::{RunEventStream, channel, sse_response};
+pub use sse::{RunEventStream, channel, sse_response, sse_response_with_budget};
 
 #[cfg(test)]
 mod tests {
@@ -39,6 +41,8 @@ mod tests {
     fn routes_are_absolute() {
         assert!(routes::HEALTH.starts_with('/'));
         assert!(routes::AGENT_STREAM.starts_with("/api/"));
+        assert!(routes::SESSIONS_EVENTS.starts_with("/api/sessions/"));
+        assert!(routes::SESSIONS_EVENTS.ends_with("/events"));
         assert_eq!(SSE_KEEPALIVE, ":keepalive");
     }
 }

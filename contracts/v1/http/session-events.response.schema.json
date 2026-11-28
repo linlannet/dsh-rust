@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.session-events.response",
+  "title": "SessionEventsResponse",
+  "description": "GET /api/sessions/{sessionId}/events 响应体：按 seq 升序的事件分页。lastSeq 为本次返回的最后一条事件 seq，无事件时为 0。",
+  "type": "object",
+  "required": ["sessionId", "events", "lastSeq"],
+  "properties": {
+    "sessionId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "events": {
+      "type": "array",
+      "description": "按 seq 升序排列，不含心跳与非业务事件。",
+      "items": { "$ref": "../persistence/session-event.schema.json" }
+    },
+    "lastSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "本次返回的最后一条事件 seq；空结果时为 0，供客户端作为下一次 afterSeq。"
+    }
+  },
+  "additionalProperties": true
+}

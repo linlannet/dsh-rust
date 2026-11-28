@@ -14,8 +14,8 @@ use dsh_case::{AgentService, RunRegistry, RunnerConfig, ToolRegistry};
 use dsh_domain::{BoxFuture, ModelPort, ModelRequest, ModelStep, Tool};
 use dsh_http::{AppState, build_router};
 use dsh_infra::{
-    ClockTool, EchoTool, FakeModel, FakeScript, InMemorySessionRepository, ReadFileSandbox,
-    ReadFileTool,
+    ClockTool, EchoTool, FakeModel, FakeScript, InMemorySessionEventLog, InMemorySessionRepository,
+    ReadFileSandbox, ReadFileTool,
 };
 use serde_json::Value;
 use tower::ServiceExt;
@@ -36,6 +36,7 @@ fn app_with(model: Arc<dyn ModelPort>) -> Router {
         model,
         Arc::new(registry),
         Arc::new(InMemorySessionRepository::default()),
+        Arc::new(InMemorySessionEventLog::default()),
         Arc::new(RunRegistry::default()),
         RunnerConfig::default(),
     );

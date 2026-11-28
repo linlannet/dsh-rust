@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use dsh_domain::{Session, SessionRepository};
-use dsh_types::{Error, ErrorCode, SessionId};
+use dsh_domain::{EventLog, Session, SessionRepository};
+use dsh_types::{Error, ErrorCode, SessionEvent, SessionId};
 
 /// 进程内会话仓库，仅用于骨架与测试，不提供持久化。
 #[derive(Debug, Default)]
@@ -54,6 +54,107 @@ mod tests {
 
         assert_eq!(repository.load(&id).expect("load"), Some(session));
         assert!(!repository.is_empty());
+    }
+}
+
+/// 进程内会话事件日志，用于测试与 `DSH_STORE=memory` 回滚通道。
+///
+/// 与 [`InMemoryRunEventLog`] 区分：后者是单次运行的 SSE 事件广播，
+/// 本类型对应领域端口 [`EventLog`]，即跨会话可回放的溯源日志。
+#[derive(Debug, Default)]
+pub struct InMemorySessionEventLog {
+    events: Mutex<Vec<SessionEvent>>,
+}
+
+impl InMemorySessionEventLog {
+    /// 当前事件总数。
+    pub fn len(&self) -> usize {
+        self.events.lock().map(|events| events.len()).unwrap_or(0)
+    }
+
+    /// 是否没有任何事件。
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl EventLog for InMemorySessionEventLog {
+    fn append(&self, event: SessionEvent) -> Result<SessionEvent, Error> {
+        let mut events = self
+            .events
+            .lock()
+            .map_err(|_| Error::new(ErrorCode::Internal, "event log lock poisoned"))?;
+        let seq = events
+            .iter()
+            .filter(|stored| stored.session_id == event.session_id)
+            .map(|stored| stored.seq)
+            .max()
+            .unwrap_or(0)
+            + 1;
+        let stored = SessionEvent {
+            event_id: format!("evt-{seq}"),
+            seq,
+            ..event
+        };
+        events.push(stored.clone());
+        Ok(stored)
+    }
+
+    fn append_many(&self, events: Vec<SessionEvent>) -> Result<Vec<SessionEvent>, Error> {
+        let mut stored_events = self
+            .events
+            .lock()
+            .map_err(|_| Error::new(ErrorCode::Internal, "event log lock poisoned"))?;
+        let mut stored = Vec::with_capacity(events.len());
+        for event in events {
+            let seq = stored_events
+                .iter()
+                .chain(stored.iter())
+                .filter(|existing| existing.session_id == event.session_id)
+                .map(|existing| existing.seq)
+                .max()
+                .unwrap_or(0)
+                + 1;
+            let assigned = SessionEvent {
+                event_id: format!("evt-{seq}"),
+                seq,
+                ..event
+            };
+            stored.push(assigned);
+        }
+        stored_events.extend(stored.iter().cloned());
+        Ok(stored)
+    }
+
+    fn list_after(
+        &self,
+        session_id: &SessionId,
+        after_seq: u64,
+        limit: usize,
+    ) -> Result<Vec<SessionEvent>, Error> {
+        let events = self
+            .events
+            .lock()
+            .map_err(|_| Error::new(ErrorCode::Internal, "event log lock poisoned"))?;
+        Ok(events
+            .iter()
+            .filter(|stored| stored.session_id == *session_id && stored.seq > after_seq)
+            .take(limit)
+            .cloned()
+            .collect())
+    }
+
+    fn last_seq(&self, session_id: &SessionId) -> Result<u64, Error> {
+        let events = self
+            .events
+            .lock()
+            .map_err(|_| Error::new(ErrorCode::Internal, "event log lock poisoned"))?;
+        Ok(events
+            .iter()
+            .filter(|stored| stored.session_id == *session_id)
+            .map(|stored| stored.seq)
+            .max()
+            .unwrap_or(0))
     }
 }
 

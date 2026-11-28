@@ -2,6 +2,8 @@
 //!
 //! ReAct 最小循环：模型推理 → 工具执行 → 结果回填 → 再推理 → 终止。
 
+mod blocking;
+
 pub mod event_sink;
 pub mod run_registry;
 pub mod runner;

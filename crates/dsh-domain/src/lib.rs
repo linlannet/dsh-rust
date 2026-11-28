@@ -9,7 +9,7 @@ pub mod session;
 pub mod tool;
 
 pub use model::{BoxFuture, ChatMessage, ModelPort, ModelRequest, ModelStep, Role};
-pub use ports::SessionRepository;
+pub use ports::{EventLog, SessionRepository};
 pub use run::{FinishReason, RunEvent, RunStatus, ToolCallStatus, Usage};
 pub use session::Session;
 pub use tool::Tool;

@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.85%2B-orange.svg)](#6-技术栈)
 [![Edition](https://img.shields.io/badge/edition-2024-blue.svg)](#6-技术栈)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue.svg)](#9-路线图)
+[![Version](https://img.shields.io/badge/version-0.2.1-blue.svg)](#9-路线图)
 
 ---
 
@@ -16,7 +16,7 @@
 
 基于 DeepSeek Harness 的 **Rust 版本实现**，目标是**一切皆插件**的 Rust 复刻，并持续迭代跟踪参考源与 Java 版的动态演进。
 
-当前版本 `0.2.0` 是**首个可运行版本**：HTTP/SSE 服务可用，ReAct 最小闭环可完成一次真实工具调用，严格按 `contracts/v1` 输出；默认 FakeModel 无需网络即可运行，DeepSeek 适配器由 feature 开启。
+当前版本 `0.2.1` 在 0.2.0 的可运行闭环之上补齐**持久化与回放**：会话与事件落 SQLite，进程重启后续跑同一会话，事件可按 `seq` 分页回放；流式输出有字节预算兜底。
 
 - **端口**：`127.0.0.1:8090`（默认，可通过 `DSH_BIND_ADDR` 修改）
 - **契约版本**：`1.0.0-draft.1`（与产品版本独立，见 `contracts/VERSION`）
@@ -46,16 +46,17 @@
 
 ## 1. 项目介绍
 
-dsh-rust 用 Rust 复刻 DeepSeek Harness 的核心形态。0.2.0 交付：
+dsh-rust 用 Rust 复刻 DeepSeek Harness 的核心形态。0.2.1 交付：
 
-- **可运行 HTTP 服务**：健康检查、阻塞消息、SSE 流式、取消四个端点。
+- **可运行 HTTP 服务**：健康检查、阻塞消息、SSE 流式、取消、会话事件回放五个端点。
 - **ReAct 最小闭环**：模型推理 → 工具调用 → 工具结果回填 → 再推理 → 终止；默认步数上限 8。
+- **持久化与续跑**：SQLite 存会话投影与事件日志，重启后同一 `sessionId` 可继续对话。
+- **事件回放**：`session.created`/`message.appended`/`run.started`/`tool.*`/`run.*` 六类事件，按 `seq` 分页读取。
 - **模型双轨**：FakeModel（默认，可脚本化）与 DeepSeek Chat Completions 适配器（feature `deepseek`）。
 - **内置工具**：`echo`、`clock`、`read_file`（工作区沙箱、UTF-8、256 KiB 上限、5s 超时）。
-- **契约对齐**：SSE 事件 `chunk`/`tool_call`/`done`/`error`；seq 递增、单终态、keepalive 不占 seq。
-- **契约回放**：4 组运行时导出 fixtures + 回放测试；openapi 由路由表生成并在 CI 校验。
+- **契约对齐**：SSE 事件 `chunk`/`tool_call`/`done`/`error`；seq 递增、单终态、keepalive 不占 seq；输出超预算以 `stream_budget_exceeded` 收尾。
 
-本版本**不包含**：插件宿主、持久化、鉴权、审批、多租户。对应能力见 `docs/0.2.0/spec.md` §8。
+本版本**不包含**：插件宿主、审批、鉴权、多租户。对应能力见 `docs/0.2.1/spec.md` §8。
 
 ---
 
@@ -77,7 +78,7 @@ cargo run -p dsh-runtime
 默认以 FakeModel 启动，监听 `127.0.0.1:8090`：
 
 ```text
-INFO dsh_runtime: dsh-runtime starting bind=127.0.0.1:8090 model="fake" tools=3 contract="1.0.0-draft.1" version="0.2.0"
+INFO dsh_runtime: dsh-runtime starting bind=127.0.0.1:8090 model="fake" store="sqlite" db=./data/dsh-rust.db tools=3 stream_budget_bytes=8388608 contract="1.0.0-draft.1" version="0.2.1"
 ```
 
 ### 2.3 调用示例
@@ -100,9 +101,12 @@ curl -sN -X POST http://127.0.0.1:8090/api/agent/stream \
 curl -s -X POST http://127.0.0.1:8090/api/agent/cancel \
   -H 'content-type: application/json' \
   -d '{"agentId":"agent-1","runId":"run-xxx"}'
+
+# 回放会话事件（afterSeq 递增翻页）
+curl -s 'http://127.0.0.1:8090/api/sessions/sess-xxx/events?afterSeq=0&limit=200'
 ```
 
-触发一次工具调用：以 `DSH_FAKE_SCRIPT=tool` 启动，FakeModel 会先请求 `clock` 工具，再总结工具结果。
+触发一次工具调用：以 `DSH_FAKE_SCRIPT=tool` 启动，FakeModel 会先请求 `clock` 工具，再总结工具结果。会话与事件默认写入 `./data/dsh-rust.db`；`DSH_STORE=memory` 可退回纯内存模式。
 
 ### 2.4 配置
 
@@ -118,6 +122,9 @@ curl -s -X POST http://127.0.0.1:8090/api/agent/cancel \
 | `DSH_READ_FILE_MAX_BYTES` | `262144` | 单文件读取上限 |
 | `DSH_MODEL_BASE_URL` | `https://api.deepseek.com` | 仅 deepseek |
 | `DEEPSEEK_API_KEY` | 无 | 仅 deepseek；缺失启动失败 |
+| `DSH_STORE` | `sqlite` | `sqlite` / `memory`；`memory` 为回滚通道 |
+| `DSH_DB_PATH` | `./data/dsh-rust.db` | 数据库路径，目录不存在则创建 |
+| `DSH_STREAM_BUDGET_BYTES` | `8388608` | 单 run SSE 字节预算 |
 
 启用 DeepSeek：
 
@@ -172,8 +179,9 @@ apps/dsh-runtime        配置、装配、axum::serve、优雅关闭
 | POST | `/api/agent/message` | 阻塞式 Agent 消息，返回 `AgentMessageResponse` |
 | POST | `/api/agent/stream` | SSE 流式输出 |
 | POST | `/api/agent/cancel` | 按 `runId` 或 `agentId` 取消 |
+| GET | `/api/sessions/{sessionId}/events` | 按 `seq` 分页回放会话事件（`afterSeq`/`limit`） |
 
-错误映射：`invalid_request→400`、`not_found→404`、`conflict→409`、`timeout→504`、`unavailable→503`、`invalid_response→502`、`internal→500`；错误体统一 `{code, message, retryable?, traceId?}`。
+错误映射：`invalid_request→400`、`not_found→404`、`conflict→409`、`timeout→504`、`unavailable→503`、`storage_unavailable→503`、`invalid_response→502`、`internal→500`；错误体统一 `{code, message, retryable?, traceId?}`。
 
 SSE 事件（对齐 `contracts/v1/sse/catalog.md`）：
 
@@ -219,6 +227,7 @@ data: {"finishReason":"stop"}
 | 序列化 | serde 1 + serde_json 1 |
 | 日志 | tracing 0.1 + tracing-subscriber 0.3 |
 | DeepSeek | reqwest 0.12（可选 feature `deepseek`，rustls） |
+| 存储 | rusqlite 0.40（`bundled`，仅 `dsh-infra`）+ `spawn_blocking` 桥接 |
 | 契约校验 | Node.js + `contracts/tools/*.mjs` |
 
 ---
@@ -229,8 +238,8 @@ data: {"finishReason":"stop"}
 | --- | --- | --- |
 | 格式 | `cargo fmt --all --check` | 通过 |
 | 静态检查 | `cargo clippy --workspace --all-targets --all-features -- -D warnings` | 通过 |
-| 测试 | `cargo test --workspace --all-features` | 51 passed |
-| 契约校验 | `node contracts/tools/validate.mjs` | 29 schema / 52 refs / 8 fixtures，0 警告 |
+| 测试 | `cargo test --workspace --all-features` | 87 passed |
+| 契约校验 | `node contracts/tools/validate.mjs` | 31 schema / 68 refs / 10 fixtures，0 警告 |
 | openapi 一致性 | `node contracts/tools/generate-openapi.mjs --check` | 通过 |
 
 CI 见 `.github/workflows/ci.yml`，与上表命令一致。
@@ -240,10 +249,12 @@ CI 见 `.github/workflows/ci.yml`，与上表命令一致。
 ## 8. 文档
 
 - `docs/0.1.0/`：骨架版本四件套
-- `docs/0.2.0/spec.md`：HTTP + ReAct 最小闭环需求与验收
-- `docs/0.2.0/design.md`：分层、接口、选型与风险
-- `docs/0.2.0/tasks.md`：编码任务与完成状态
-- `docs/0.2.0/release-v0.2.0-development-notes.md`：验证结论与已知限制
+- `docs/0.2.0/`：HTTP + ReAct 最小闭环四件套
+- `docs/0.2.1/spec.md`：持久化与回放需求与验收
+- `docs/0.2.1/design.md`：存储选型、事件模型、阻塞桥接与风险
+- `docs/0.2.1/tasks.md`：编码任务与完成状态
+- `docs/0.2.1/release-notes-v0.2.1.md`（英文版 `release-notes-v0.2.1.en.md`）：面向使用者的发布说明（新特性、行为变化、升级指南）
+- `docs/0.2.1/release-v0.2.1-development-notes.md`：验证结论与已知限制
 - `contracts/README.md`：契约目录与录制流程
 - `AGENTS.md` / `llms.txt`：AI 编码助手入口
 
@@ -255,5 +266,7 @@ CI 见 `.github/workflows/ci.yml`，与上表命令一致。
 | --- | --- | --- |
 | 0.1.0 | 骨架与契约基线 | 分层、类型、用例、常量、内存仓储、CI |
 | 0.2.0 | 可运行 HTTP + ReAct 最小闭环 | Axum/Tokio、SSE、工具、Fake/DeepSeek、契约回放 |
-| 0.2.1 | 插件宿主与持久化 | 插件 manifest/host、会话事件持久化与回放 |
+| 0.2.1 | 持久化与回放 | 会话/事件落 SQLite、重启续跑、事件回放端点、SSE 输出预算 |
+| 0.2.2 | 插件宿主 | 插件 manifest/host，stdio JSON-RPC 对接 Java 宿主 |
+| 0.2.3 | 审批与权限矩阵 | 工具策略、审批事件与运行期挂起 |
 | 后续 | 对齐参考源能力面 | 按参考源与 dsh-java 的升级项逐版对齐 |

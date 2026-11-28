@@ -1,0 +1,18 @@
+{
+  "scenario": "http/session-events/001-replay-page",
+  "contracts": {
+    "request": "v1/http/session-events.request.schema.json",
+    "response": "v1/http/session-events.response.schema.json"
+  },
+  "origin": "handwritten-sample",
+  "recorded": false,
+  "capturedAt": null,
+  "source": {
+    "repo": null,
+    "commit": null,
+    "endpoint": "GET /api/sessions/{sessionId}/events"
+  },
+  "normalized": ["eventId", "timestamp", "sessionId"],
+  "redacted": ["authorization"],
+  "notes": "回放分页：limit=2 返回前两条，lastSeq=2 作为下一次 afterSeq；事件内容与 persistence/001-session-replay 保持一致。"
+}

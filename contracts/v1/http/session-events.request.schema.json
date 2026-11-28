@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "dsh.v1.http.session-events.request",
+  "title": "SessionEventsRequest",
+  "description": "GET /api/sessions/{sessionId}/events 的请求参数。该端点无请求体，此处描述路径与查询参数，供 fixtures 与契约回放使用。",
+  "type": "object",
+  "required": ["sessionId"],
+  "properties": {
+    "sessionId": { "$ref": "../common/identifiers.schema.json#/$defs/id" },
+    "afterSeq": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "只返回 seq 大于该值的事件。"
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 200,
+      "description": "单次最多返回的事件条数。"
+    }
+  },
+  "additionalProperties": false
+}

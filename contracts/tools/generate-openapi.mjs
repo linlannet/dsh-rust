@@ -95,6 +95,33 @@ paths:
                   runId: { $ref: './common/identifiers.schema.json#/$defs/id' }
                   status: { type: string }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/sessions/{sessionId}/events:
+    get:
+      operationId: sessionEvents
+      description: 按 seq 升序分页读取会话事件，用于回放与差分校验。
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { $ref: './common/identifiers.schema.json#/$defs/id' }
+        - name: afterSeq
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+      responses:
+        '200':
+          description: Session events ordered by seq
+          content:
+            application/json:
+              schema:
+                $ref: './http/session-events.response.schema.json'
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 components:
   responses:
     InvalidRequest:

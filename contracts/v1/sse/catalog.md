@@ -33,6 +33,7 @@ fixture 存储为 NDJSON，一行一个业务事件，已剥离 `event:`、`data
 3. 取消返回 `done` + `finishReason: cancelled`，或 `error`，不得两者同时出现。
 4. 心跳以 `:keepalive` 注释发送，不占 `seq`，不进入 fixture。
 5. 未知事件必须被消费者忽略并记录告警，不得中断流或崩溃。
+6. 单 run 输出超过 `DSH_STREAM_BUDGET_BYTES`（默认 8 MiB）时，丢弃当前事件并以唯一终态 `error`（`code: stream_budget_exceeded`）收尾，此后不再有事件；`seq` 仍连续。
 
 ## 一致性要求
 

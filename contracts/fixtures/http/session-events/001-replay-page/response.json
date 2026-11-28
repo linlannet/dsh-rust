@@ -1,0 +1,33 @@
+{
+  "sessionId": "sess-1",
+  "events": [
+    {
+      "eventId": "evt-1",
+      "sessionId": "sess-1",
+      "seq": 1,
+      "type": "session.created",
+      "timestamp": "2026-11-27T00:00:00Z",
+      "payload": {
+        "agentId": "agent-1"
+      }
+    },
+    {
+      "eventId": "evt-2",
+      "sessionId": "sess-1",
+      "seq": 2,
+      "type": "message.appended",
+      "timestamp": "2026-11-27T00:00:01Z",
+      "payload": {
+        "messageId": "msg-1",
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "统计 rust go rust"
+          }
+        ]
+      }
+    }
+  ],
+  "lastSeq": 2
+}

@@ -12,5 +12,24 @@
     "traceId": { "type": "string" },
     "details": { "type": "object", "additionalProperties": true }
   },
+  "$defs": {
+    "errorCode": {
+      "title": "ErrorCode",
+      "description": "稳定错误码集合。只允许追加，不得复用或改名；未知码的消费方应记录告警后按 internal 处理。",
+      "type": "string",
+      "enum": [
+        "invalid_request",
+        "not_found",
+        "conflict",
+        "timeout",
+        "cancelled",
+        "internal",
+        "unavailable",
+        "storage_unavailable",
+        "invalid_response",
+        "stream_budget_exceeded"
+      ]
+    }
+  },
   "additionalProperties": true
 }

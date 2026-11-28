@@ -2,7 +2,7 @@
 
 use dsh_case::{RunOutcome, ToolCallRecord};
 use dsh_domain::RunStatus;
-use dsh_types::{AgentId, ContentBlock, Error, Id, JsonValue, RunId, SessionId};
+use dsh_types::{AgentId, ContentBlock, Error, Id, JsonValue, RunId, SessionEvent, SessionId};
 use serde::{Deserialize, Serialize};
 
 /// `POST /api/agent/message` 与 `/api/agent/stream` 请求体。
@@ -127,6 +127,30 @@ pub struct HealthResponse {
     pub version: &'static str,
     /// 契约版本。
     pub contract_version: &'static str,
+}
+
+/// `GET /api/sessions/{sessionId}/events` 查询参数。
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEventsQuery {
+    /// 只返回 seq 大于该值的事件，默认 0。
+    #[serde(default)]
+    pub after_seq: Option<i64>,
+    /// 单次返回上限，默认 200、上限 1000。
+    #[serde(default)]
+    pub limit: Option<i64>,
+}
+
+/// 会话事件分页响应。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionEventsResponse {
+    /// 会话。
+    pub session_id: SessionId,
+    /// 按 seq 升序的事件。
+    pub events: Vec<SessionEvent>,
+    /// 本次返回的最后一条事件 seq；无事件时为 0。
+    pub last_seq: u64,
 }
 
 /// 统一错误体。

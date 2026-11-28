@@ -17,6 +17,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo check --workspace --all-features
       - run: cargo test --workspace --all-features
+      - run: cargo test -p dsh-http --test contract_replay
 
   contracts:
     runs-on: ubuntu-latest
